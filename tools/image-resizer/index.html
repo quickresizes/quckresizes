@@ -172,6 +172,36 @@
         border-radius: 8px;
       }
 
+      .preview-grid {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .preview-label {
+        margin: 0 0 0.6rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #374151;
+      }
+
+      .download-btn {
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-weight: 600;
+        font-size: clamp(0.9rem, 1.8vw, 0.96rem);
+        padding: 0.72rem 1rem;
+        min-height: 44px;
+        width: 100%;
+        cursor: pointer;
+      }
+
+      .download-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
       @media (max-width: 600px) {
         body {
           font-size: 15px;
@@ -230,32 +260,140 @@
           </div>
         </form>
 
-        <div class="preview-area" aria-live="polite">
-          <p class="preview-placeholder">Image preview will appear here</p>
-          <img class="preview-image" alt="Uploaded image preview" hidden />
+        <div class="preview-grid" aria-live="polite">
+          <div class="preview-area">
+            <div>
+              <p class="preview-label">Original Image</p>
+              <p class="preview-placeholder">Image preview will appear here</p>
+              <img class="preview-image original-preview" alt="Uploaded image preview" hidden />
+            </div>
+          </div>
+
+          <div class="preview-area">
+            <div>
+              <p class="preview-label">Resized Image</p>
+              <p class="preview-placeholder resized-placeholder">Resized image preview will appear here</p>
+              <img class="preview-image resized-preview" alt="Resized image preview" hidden />
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="download-btn" type="button" disabled>Download Image</button>
+          </div>
         </div>
       </section>
     </main>
 
     <script>
       const fileInput = document.getElementById("imageUpload");
-      const previewImage = document.querySelector(".preview-image");
-      const previewPlaceholder = document.querySelector(".preview-placeholder");
+      const widthInput = document.getElementById("width");
+      const heightInput = document.getElementById("height");
+      const resizeButton = document.querySelector(".resize-btn");
+      const downloadButton = document.querySelector(".download-btn");
+      const originalPreview = document.querySelector(".original-preview");
+      const resizedPreview = document.querySelector(".resized-preview");
+      const originalPlaceholder = document.querySelector(".preview-placeholder");
+      const resizedPlaceholder = document.querySelector(".resized-placeholder");
+
+      let currentFileUrl = "";
+      let resizedImageUrl = "";
+      let resizedMimeType = "image/png";
+
+      function clearResizedPreview() {
+        if (resizedImageUrl) {
+          URL.revokeObjectURL(resizedImageUrl);
+          resizedImageUrl = "";
+        }
+
+        resizedPreview.hidden = true;
+        resizedPreview.removeAttribute("src");
+        resizedPlaceholder.hidden = false;
+        downloadButton.disabled = true;
+      }
 
       fileInput.addEventListener("change", (event) => {
         const [file] = event.target.files;
 
+        if (currentFileUrl) {
+          URL.revokeObjectURL(currentFileUrl);
+          currentFileUrl = "";
+        }
+
         if (!file) {
-          previewImage.hidden = true;
-          previewImage.removeAttribute("src");
-          previewPlaceholder.hidden = false;
+          originalPreview.hidden = true;
+          originalPreview.removeAttribute("src");
+          originalPlaceholder.hidden = false;
+          clearResizedPreview();
           return;
         }
 
-        const objectUrl = URL.createObjectURL(file);
-        previewImage.src = objectUrl;
-        previewImage.hidden = false;
-        previewPlaceholder.hidden = true;
+        currentFileUrl = URL.createObjectURL(file);
+        originalPreview.src = currentFileUrl;
+        originalPreview.hidden = false;
+        originalPlaceholder.hidden = true;
+        clearResizedPreview();
+      });
+
+      resizeButton.addEventListener("click", () => {
+        const [file] = fileInput.files;
+        const width = Number.parseInt(widthInput.value, 10);
+        const height = Number.parseInt(heightInput.value, 10);
+
+        if (!file || !width || !height || width < 1 || height < 1) {
+          return;
+        }
+
+        const image = new Image();
+        const sourceUrl = URL.createObjectURL(file);
+
+        image.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+
+          const context = canvas.getContext("2d");
+          context.drawImage(image, 0, 0, width, height);
+
+          resizedMimeType = file.type || "image/png";
+
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              URL.revokeObjectURL(sourceUrl);
+              return;
+            }
+
+            if (resizedImageUrl) {
+              URL.revokeObjectURL(resizedImageUrl);
+            }
+
+            resizedImageUrl = URL.createObjectURL(blob);
+            resizedPreview.src = resizedImageUrl;
+            resizedPreview.hidden = false;
+            resizedPlaceholder.hidden = true;
+            downloadButton.disabled = false;
+            URL.revokeObjectURL(sourceUrl);
+          }, resizedMimeType);
+        };
+
+        image.src = sourceUrl;
+      });
+
+      downloadButton.addEventListener("click", () => {
+        if (!resizedImageUrl) {
+          return;
+        }
+
+        const link = document.createElement("a");
+        const [file] = fileInput.files;
+        const originalName = file?.name ? file.name.replace(/\.[^/.]+$/, "") : "resized-image";
+
+        const extension = resizedMimeType === "image/jpeg" ? "jpg" : "png";
+
+        link.href = resizedImageUrl;
+        link.download = `${originalName}-${widthInput.value || "custom"}x${heightInput.value || "custom"}.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       });
     </script>
   </body>
