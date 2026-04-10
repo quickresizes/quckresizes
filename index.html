@@ -3,10 +3,203 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>quckresizes</title>
+    <title>QuickResizes | Fast Online Image Tools</title>
+    <style>
+      :root {
+        --bg: #f5f7fb;
+        --surface: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --primary: #2563eb;
+        --primary-dark: #1d4ed8;
+        --border: #e2e8f0;
+        --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text);
+        background: linear-gradient(160deg, #eef3ff 0%, var(--bg) 45%, #f8fafc 100%);
+        min-height: 100vh;
+      }
+
+      .container {
+        width: min(1100px, 92%);
+        margin: 0 auto;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(6px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 0;
+      }
+
+      .brand {
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+      }
+
+      nav {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      nav a {
+        text-decoration: none;
+        color: var(--muted);
+        font-weight: 600;
+        padding: 0.35rem 0.55rem;
+        border-radius: 8px;
+        transition: color 0.2s ease, background-color 0.2s ease;
+      }
+
+      nav a:hover,
+      nav a:focus-visible {
+        color: var(--primary-dark);
+        background: #eff6ff;
+      }
+
+      main {
+        padding: 3.5rem 0 4rem;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+
+      .hero h1 {
+        font-size: clamp(2rem, 4vw, 3rem);
+        margin: 0 0 0.75rem;
+      }
+
+      .hero p {
+        margin: 0 auto;
+        max-width: 640px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .tools h2 {
+        font-size: 1.6rem;
+        margin-bottom: 1rem;
+      }
+
+      .tools-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+      }
+
+      .tool-card {
+        display: block;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.2rem;
+        color: inherit;
+        text-decoration: none;
+        box-shadow: var(--shadow);
+        transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .tool-card:hover,
+      .tool-card:focus-visible {
+        transform: translateY(-3px);
+        border-color: #bfdbfe;
+        box-shadow: 0 16px 36px rgba(37, 99, 235, 0.15);
+      }
+
+      .tool-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+      }
+
+      .tool-desc {
+        color: var(--muted);
+        margin: 0;
+      }
+
+      footer {
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        text-align: center;
+        padding: 1.5rem 0;
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 700px) {
+        .header-inner {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        nav {
+          gap: 0.4rem;
+        }
+      }
+    </style>
   </head>
   <body>
-    <h1>quckresizes</h1>
-    <p>Welcome to quckresizes.</p>
+    <header>
+      <div class="container header-inner">
+        <div class="brand">QuickResizes</div>
+        <nav aria-label="Main navigation">
+          <a href="/index.html">Home</a>
+          <a href="/pages/about.html">About</a>
+          <a href="/pages/contact.html">Contact</a>
+          <a href="/pages/privacy.html">Privacy Policy</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero" aria-labelledby="home-title">
+        <h1 id="home-title">Smart, Fast & Reliable Media Utilities</h1>
+        <p>
+          QuickResizes provides streamlined online tools to help you optimize, resize,
+          and manage media in seconds. Built for creators, teams, and everyday users.
+        </p>
+      </section>
+
+      <section class="tools" aria-labelledby="tools-title">
+        <h2 id="tools-title">Our Tools</h2>
+        <div class="tools-grid">
+          <a class="tool-card" href="/tools/image-resizer/index.html">
+            <div class="tool-title">Image Resizer</div>
+            <p class="tool-desc">
+              Resize images quickly with a clean workflow and quality-focused output.
+            </p>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      &copy; <span id="year"></span> QuickResizes. All rights reserved.
+    </footer>
+
+    <script>
+      document.getElementById("year").textContent = new Date().getFullYear();
+    </script>
   </body>
 </html>
