@@ -3,10 +3,242 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Resizer | quckresizes</title>
+    <title>Image Resizer | QuickResizes</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fb;
+        --surface: #ffffff;
+        --surface-border: #e5e9f2;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #2563eb;
+        --primary-hover: #1d4ed8;
+        --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text);
+        background: linear-gradient(180deg, #f8faff 0%, var(--bg) 100%);
+        min-height: 100vh;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        width: 100%;
+        border-bottom: 1px solid rgba(229, 233, 242, 0.85);
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(8px);
+      }
+
+      .header-inner {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 1rem 1.25rem;
+      }
+
+      .brand {
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      main {
+        display: grid;
+        place-items: center;
+        min-height: calc(100vh - 72px);
+        padding: 2rem 1rem 3rem;
+      }
+
+      .resizer-card {
+        width: min(100%, 700px);
+        background: var(--surface);
+        border: 1px solid var(--surface-border);
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+        padding: clamp(1.25rem, 3vw, 2rem);
+      }
+
+      .resizer-card h1 {
+        margin: 0 0 0.75rem;
+        font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+      }
+
+      .subtext {
+        margin: 0 0 1.5rem;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .dimensions {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      label {
+        display: block;
+        margin-bottom: 0.45rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      input[type="file"],
+      input[type="number"] {
+        width: 100%;
+        border: 1px solid #d6dbe8;
+        border-radius: 10px;
+        background: #fff;
+        color: var(--text);
+        padding: 0.7rem 0.8rem;
+        font-size: 0.95rem;
+      }
+
+      input[type="file"] {
+        padding: 0.58rem 0.7rem;
+      }
+
+      input:focus-visible,
+      button:focus-visible {
+        outline: 3px solid rgba(37, 99, 235, 0.22);
+        outline-offset: 1px;
+      }
+
+      .button-row {
+        margin-top: 0.35rem;
+      }
+
+      .resize-btn {
+        border: 0;
+        border-radius: 10px;
+        background: var(--primary);
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.95rem;
+        padding: 0.78rem 1rem;
+        width: 100%;
+        cursor: pointer;
+        transition: background-color 0.18s ease;
+      }
+
+      .resize-btn:hover {
+        background: var(--primary-hover);
+      }
+
+      .preview-area {
+        margin-top: 1.4rem;
+        border: 1px dashed #cbd5e1;
+        border-radius: 12px;
+        background: #f9fbff;
+        min-height: 260px;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        overflow: hidden;
+      }
+
+      .preview-placeholder {
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .preview-image {
+        max-width: 100%;
+        max-height: 360px;
+        object-fit: contain;
+        border-radius: 8px;
+      }
+
+      @media (max-width: 600px) {
+        .dimensions {
+          grid-template-columns: 1fr;
+        }
+
+        .header-inner {
+          padding-inline: 1rem;
+        }
+
+        main {
+          padding-top: 1.25rem;
+        }
+      }
+    </style>
   </head>
   <body>
-    <h1>Image Resizer</h1>
-    <p>Tool page for resizing images.</p>
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="brand">QuickResizes</div>
+      </div>
+    </header>
+
+    <main>
+      <section class="resizer-card" aria-labelledby="resizer-heading">
+        <h1 id="resizer-heading">Image Resizer</h1>
+        <p class="subtext">Upload an image, set custom dimensions, and prepare it for resizing.</p>
+
+        <form class="form-grid" action="#" method="post">
+          <div>
+            <label for="imageUpload">Upload image</label>
+            <input id="imageUpload" name="imageUpload" type="file" accept="image/*" />
+          </div>
+
+          <div class="dimensions">
+            <div>
+              <label for="width">Width (px)</label>
+              <input id="width" name="width" type="number" min="1" placeholder="e.g. 1200" />
+            </div>
+            <div>
+              <label for="height">Height (px)</label>
+              <input id="height" name="height" type="number" min="1" placeholder="e.g. 800" />
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="resize-btn" type="button">Resize Image</button>
+          </div>
+        </form>
+
+        <div class="preview-area" aria-live="polite">
+          <p class="preview-placeholder">Image preview will appear here</p>
+          <img class="preview-image" alt="Uploaded image preview" hidden />
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const fileInput = document.getElementById("imageUpload");
+      const previewImage = document.querySelector(".preview-image");
+      const previewPlaceholder = document.querySelector(".preview-placeholder");
+
+      fileInput.addEventListener("change", (event) => {
+        const [file] = event.target.files;
+
+        if (!file) {
+          previewImage.hidden = true;
+          previewImage.removeAttribute("src");
+          previewPlaceholder.hidden = false;
+          return;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+        previewImage.src = objectUrl;
+        previewImage.hidden = false;
+        previewPlaceholder.hidden = true;
+      });
+    </script>
   </body>
 </html>
