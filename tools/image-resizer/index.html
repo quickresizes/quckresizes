@@ -159,6 +159,10 @@
         overflow: hidden;
       }
 
+      .preview-content {
+        width: 100%;
+      }
+
       .preview-placeholder {
         text-align: center;
         color: var(--muted);
@@ -172,6 +176,10 @@
         border-radius: 8px;
       }
 
+      .preview-image.clickable {
+        cursor: zoom-in;
+      }
+
       .preview-grid {
         display: grid;
         gap: var(--space-2);
@@ -182,6 +190,38 @@
         font-size: 0.9rem;
         font-weight: 600;
         color: #374151;
+      }
+
+      .details-box {
+        margin-top: 0.7rem;
+        border: 1px solid #dbe5f5;
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 0.7rem 0.8rem;
+        font-size: 0.87rem;
+      }
+
+      .details-box[hidden] {
+        display: none;
+      }
+
+      .details-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0.38rem;
+      }
+
+      .details-list li {
+        color: #334155;
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .details-key {
+        color: #64748b;
       }
 
       .download-btn {
@@ -200,6 +240,51 @@
       .download-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.8);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        z-index: 50;
+      }
+
+      .modal-overlay.show {
+        display: flex;
+      }
+
+      .modal-content {
+        width: min(95vw, 1000px);
+        max-height: 95vh;
+        background: #0f172a;
+        border-radius: 12px;
+        padding: 0.75rem;
+        position: relative;
+      }
+
+      .modal-close {
+        position: absolute;
+        top: 0.45rem;
+        right: 0.45rem;
+        border: 0;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.95);
+        color: #0f172a;
+        font-weight: 700;
+        min-height: 36px;
+        min-width: 36px;
+        cursor: pointer;
+      }
+
+      .modal-image {
+        width: 100%;
+        max-height: calc(95vh - 1.5rem);
+        object-fit: contain;
+        border-radius: 8px;
       }
 
       @media (max-width: 600px) {
@@ -222,6 +307,11 @@
 
         .preview-area {
           min-height: 180px;
+        }
+
+        .details-list li {
+          flex-direction: column;
+          gap: 0.15rem;
         }
       }
     </style>
@@ -262,18 +352,31 @@
 
         <div class="preview-grid" aria-live="polite">
           <div class="preview-area">
-            <div>
+            <div class="preview-content">
               <p class="preview-label">Original Image</p>
               <p class="preview-placeholder">Image preview will appear here</p>
               <img class="preview-image original-preview" alt="Uploaded image preview" hidden />
+              <div class="details-box original-details" hidden>
+                <ul class="details-list">
+                  <li><span class="details-key">File Name</span><span class="detail-value original-name"></span></li>
+                  <li><span class="details-key">Dimensions</span><span class="detail-value original-dimensions"></span></li>
+                  <li><span class="details-key">File Size</span><span class="detail-value original-size"></span></li>
+                </ul>
+              </div>
             </div>
           </div>
 
           <div class="preview-area">
-            <div>
+            <div class="preview-content">
               <p class="preview-label">Resized Image</p>
               <p class="preview-placeholder resized-placeholder">Resized image preview will appear here</p>
               <img class="preview-image resized-preview" alt="Resized image preview" hidden />
+              <div class="details-box resized-details" hidden>
+                <ul class="details-list">
+                  <li><span class="details-key">Dimensions</span><span class="detail-value resized-dimensions"></span></li>
+                  <li><span class="details-key">File Size</span><span class="detail-value resized-size"></span></li>
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -283,6 +386,13 @@
         </div>
       </section>
     </main>
+
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Image preview modal" hidden>
+      <div class="modal-content">
+        <button class="modal-close" type="button" aria-label="Close preview">×</button>
+        <img class="modal-image" alt="Enlarged preview" />
+      </div>
+    </div>
 
     <script>
       const fileInput = document.getElementById("imageUpload");
@@ -294,10 +404,59 @@
       const resizedPreview = document.querySelector(".resized-preview");
       const originalPlaceholder = document.querySelector(".preview-placeholder");
       const resizedPlaceholder = document.querySelector(".resized-placeholder");
+      const originalDetails = document.querySelector(".original-details");
+      const resizedDetails = document.querySelector(".resized-details");
+      const originalName = document.querySelector(".original-name");
+      const originalDimensions = document.querySelector(".original-dimensions");
+      const originalSize = document.querySelector(".original-size");
+      const resizedDimensions = document.querySelector(".resized-dimensions");
+      const resizedSize = document.querySelector(".resized-size");
+      const modalOverlay = document.querySelector(".modal-overlay");
+      const modalImage = document.querySelector(".modal-image");
+      const modalCloseButton = document.querySelector(".modal-close");
 
       let currentFileUrl = "";
       let resizedImageUrl = "";
       let resizedMimeType = "image/png";
+      let originalMeta = null;
+
+      function formatFileSize(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) {
+          return "0 KB";
+        }
+
+        if (bytes >= 1024 * 1024) {
+          return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        }
+
+        return `${(bytes / 1024).toFixed(2)} KB`;
+      }
+
+      function showOriginalDetails(file, width, height) {
+        originalName.textContent = file.name;
+        originalDimensions.textContent = `${width} × ${height} px`;
+        originalSize.textContent = formatFileSize(file.size);
+        originalDetails.hidden = false;
+      }
+
+      function hideOriginalDetails() {
+        originalDetails.hidden = true;
+        originalName.textContent = "";
+        originalDimensions.textContent = "";
+        originalSize.textContent = "";
+      }
+
+      function showResizedDetails(width, height, sizeBytes) {
+        resizedDimensions.textContent = `${width} × ${height} px`;
+        resizedSize.textContent = formatFileSize(sizeBytes);
+        resizedDetails.hidden = false;
+      }
+
+      function hideResizedDetails() {
+        resizedDetails.hidden = true;
+        resizedDimensions.textContent = "";
+        resizedSize.textContent = "";
+      }
 
       function clearResizedPreview() {
         if (resizedImageUrl) {
@@ -307,8 +466,33 @@
 
         resizedPreview.hidden = true;
         resizedPreview.removeAttribute("src");
+        resizedPreview.classList.remove("clickable");
         resizedPlaceholder.hidden = false;
         downloadButton.disabled = true;
+        hideResizedDetails();
+      }
+
+      function openModal(imageSrc, imageAlt) {
+        if (!imageSrc) {
+          return;
+        }
+
+        modalImage.src = imageSrc;
+        modalImage.alt = imageAlt;
+        modalOverlay.hidden = false;
+        modalOverlay.classList.add("show");
+        modalCloseButton.focus();
+      }
+
+      function closeModal() {
+        modalOverlay.hidden = true;
+        modalOverlay.classList.remove("show");
+        modalImage.removeAttribute("src");
+      }
+
+      function parseDimension(value, fallback) {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
       }
 
       fileInput.addEventListener("change", (event) => {
@@ -320,9 +504,12 @@
         }
 
         if (!file) {
+          originalMeta = null;
           originalPreview.hidden = true;
           originalPreview.removeAttribute("src");
+          originalPreview.classList.remove("clickable");
           originalPlaceholder.hidden = false;
+          hideOriginalDetails();
           clearResizedPreview();
           return;
         }
@@ -330,18 +517,34 @@
         currentFileUrl = URL.createObjectURL(file);
         originalPreview.src = currentFileUrl;
         originalPreview.hidden = false;
+        originalPreview.classList.add("clickable");
         originalPlaceholder.hidden = true;
         clearResizedPreview();
+
+        const image = new Image();
+        image.onload = () => {
+          originalMeta = { width: image.naturalWidth, height: image.naturalHeight };
+          widthInput.value = image.naturalWidth;
+          heightInput.value = image.naturalHeight;
+          showOriginalDetails(file, image.naturalWidth, image.naturalHeight);
+          URL.revokeObjectURL(image.src);
+        };
+
+        image.src = URL.createObjectURL(file);
       });
 
       resizeButton.addEventListener("click", () => {
         const [file] = fileInput.files;
-        const width = Number.parseInt(widthInput.value, 10);
-        const height = Number.parseInt(heightInput.value, 10);
 
-        if (!file || !width || !height || width < 1 || height < 1) {
+        if (!file || !originalMeta) {
           return;
         }
+
+        const width = parseDimension(widthInput.value, originalMeta.width);
+        const height = parseDimension(heightInput.value, originalMeta.height);
+
+        widthInput.value = width;
+        heightInput.value = height;
 
         const image = new Image();
         const sourceUrl = URL.createObjectURL(file);
@@ -357,8 +560,9 @@
           resizedMimeType = file.type || "image/png";
 
           canvas.toBlob((blob) => {
+            URL.revokeObjectURL(sourceUrl);
+
             if (!blob) {
-              URL.revokeObjectURL(sourceUrl);
               return;
             }
 
@@ -369,9 +573,10 @@
             resizedImageUrl = URL.createObjectURL(blob);
             resizedPreview.src = resizedImageUrl;
             resizedPreview.hidden = false;
+            resizedPreview.classList.add("clickable");
             resizedPlaceholder.hidden = true;
             downloadButton.disabled = false;
-            URL.revokeObjectURL(sourceUrl);
+            showResizedDetails(width, height, blob.size);
           }, resizedMimeType);
         };
 
@@ -385,15 +590,41 @@
 
         const link = document.createElement("a");
         const [file] = fileInput.files;
-        const originalName = file?.name ? file.name.replace(/\.[^/.]+$/, "") : "resized-image";
+        const originalNameValue = file?.name ? file.name.replace(/\.[^/.]+$/, "") : "resized-image";
 
         const extension = resizedMimeType === "image/jpeg" ? "jpg" : "png";
 
         link.href = resizedImageUrl;
-        link.download = `${originalName}-${widthInput.value || "custom"}x${heightInput.value || "custom"}.${extension}`;
+        link.download = `${originalNameValue}-${widthInput.value || "custom"}x${heightInput.value || "custom"}.${extension}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+      });
+
+      originalPreview.addEventListener("click", () => {
+        if (!originalPreview.hidden) {
+          openModal(originalPreview.src, "Enlarged original image preview");
+        }
+      });
+
+      resizedPreview.addEventListener("click", () => {
+        if (!resizedPreview.hidden) {
+          openModal(resizedPreview.src, "Enlarged resized image preview");
+        }
+      });
+
+      modalCloseButton.addEventListener("click", closeModal);
+
+      modalOverlay.addEventListener("click", (event) => {
+        if (event.target === modalOverlay) {
+          closeModal();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modalOverlay.hidden) {
+          closeModal();
+        }
       });
     </script>
   </body>
