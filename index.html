@@ -6,7 +6,10 @@
     <title>QuickResizes | Fast Online Image Tools</title>
     <style>
       :root {
+        color-scheme: light;
         --bg: #f5f7fb;
+        --bg-gradient-start: #eef3ff;
+        --bg-gradient-end: #f8fafc;
         --surface: #ffffff;
         --text: #0f172a;
         --muted: #475569;
@@ -14,6 +17,32 @@
         --primary-dark: #1d4ed8;
         --border: #e2e8f0;
         --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        --header-bg: rgba(255, 255, 255, 0.85);
+        --nav-hover-bg: #eff6ff;
+        --card-hover-border: #bfdbfe;
+        --card-hover-shadow: 0 16px 36px rgba(37, 99, 235, 0.15);
+        --toggle-bg: #e2e8f0;
+        --toggle-text: #0f172a;
+      }
+
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #020617;
+        --bg-gradient-start: #0f172a;
+        --bg-gradient-end: #020617;
+        --surface: #0f172a;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --primary: #60a5fa;
+        --primary-dark: #93c5fd;
+        --border: #1e293b;
+        --shadow: 0 12px 30px rgba(2, 6, 23, 0.5);
+        --header-bg: rgba(15, 23, 42, 0.85);
+        --nav-hover-bg: #1e293b;
+        --card-hover-border: #334155;
+        --card-hover-shadow: 0 16px 36px rgba(2, 6, 23, 0.7);
+        --toggle-bg: #1e293b;
+        --toggle-text: #e2e8f0;
       }
 
       * {
@@ -24,7 +53,7 @@
         margin: 0;
         font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         color: var(--text);
-        background: linear-gradient(160deg, #eef3ff 0%, var(--bg) 45%, #f8fafc 100%);
+        background: linear-gradient(160deg, var(--bg-gradient-start) 0%, var(--bg) 45%, var(--bg-gradient-end) 100%);
         min-height: 100vh;
       }
 
@@ -35,7 +64,7 @@
 
       header {
         border-bottom: 1px solid var(--border);
-        background: rgba(255, 255, 255, 0.85);
+        background: var(--header-bg);
         backdrop-filter: blur(6px);
         position: sticky;
         top: 0;
@@ -74,7 +103,25 @@
       nav a:hover,
       nav a:focus-visible {
         color: var(--primary-dark);
-        background: #eff6ff;
+        background: var(--nav-hover-bg);
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .theme-toggle {
+        border: 1px solid var(--border);
+        background: var(--toggle-bg);
+        color: var(--toggle-text);
+        border-radius: 999px;
+        min-height: 38px;
+        padding: 0.35rem 0.8rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
       }
 
       main {
@@ -124,8 +171,8 @@
       .tool-card:hover,
       .tool-card:focus-visible {
         transform: translateY(-3px);
-        border-color: #bfdbfe;
-        box-shadow: 0 16px 36px rgba(37, 99, 235, 0.15);
+        border-color: var(--card-hover-border);
+        box-shadow: var(--card-hover-shadow);
       }
 
       .tool-title {
@@ -163,12 +210,17 @@
     <header>
       <div class="container header-inner">
         <div class="brand">QuickResizes</div>
-        <nav aria-label="Main navigation">
-          <a href="index.html">Home</a>
-          <a href="pages/about.html">About</a>
-          <a href="pages/contact.html">Contact</a>
-          <a href="pages/privacy.html">Privacy Policy</a>
-        </nav>
+        <div class="controls">
+          <nav aria-label="Main navigation">
+            <a href="index.html">Home</a>
+            <a href="pages/about.html">About</a>
+            <a href="pages/contact.html">Contact</a>
+            <a href="pages/privacy.html">Privacy Policy</a>
+          </nav>
+          <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">
+            🌙 Dark
+          </button>
+        </div>
       </div>
     </header>
 
@@ -199,6 +251,26 @@
     </footer>
 
     <script>
+      const themeStorageKey = "quickresizes-theme";
+      const root = document.documentElement;
+      const themeToggle = document.getElementById("themeToggle");
+
+      function applyTheme(theme) {
+        root.setAttribute("data-theme", theme);
+        const isDark = theme === "dark";
+        themeToggle.textContent = isDark ? "☀️ Light" : "🌙 Dark";
+        themeToggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+      }
+
+      const savedTheme = localStorage.getItem(themeStorageKey);
+      applyTheme(savedTheme === "dark" ? "dark" : "light");
+
+      themeToggle.addEventListener("click", () => {
+        const nextTheme = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+        applyTheme(nextTheme);
+        localStorage.setItem(themeStorageKey, nextTheme);
+      });
+
       document.getElementById("year").textContent = new Date().getFullYear();
     </script>
   </body>
