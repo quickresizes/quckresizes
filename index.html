@@ -188,9 +188,37 @@
 
       footer {
         border-top: 1px solid var(--border);
+        padding: 1.25rem 0;
+        background: var(--surface);
+      }
+
+      .footer-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .footer-links a {
         color: var(--muted);
-        text-align: center;
-        padding: 1.5rem 0;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .footer-links a:hover,
+      .footer-links a:focus-visible {
+        color: var(--primary-dark);
+      }
+
+      .copyright {
+        color: var(--muted);
         font-size: 0.95rem;
       }
 
@@ -216,6 +244,7 @@
             <a href="pages/about.html">About</a>
             <a href="pages/contact.html">Contact</a>
             <a href="pages/privacy.html">Privacy Policy</a>
+            <a href="pages/terms.html">Terms &amp; Conditions</a>
           </nav>
           <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">
             🌙 Dark
@@ -247,7 +276,16 @@
     </main>
 
     <footer>
-      &copy; <span id="year"></span> QuickResizes. All rights reserved.
+      <div class="container footer-inner">
+        <div class="brand">QuickResizes</div>
+        <nav class="footer-links" aria-label="Footer navigation">
+          <a href="pages/about.html">About</a>
+          <a href="pages/contact.html">Contact</a>
+          <a href="pages/privacy.html">Privacy Policy</a>
+          <a href="pages/terms.html">Terms &amp; Conditions</a>
+        </nav>
+        <div class="copyright">&copy; <span id="year"></span> QuickResizes. All rights reserved.</div>
+      </div>
     </footer>
 
     <script>
