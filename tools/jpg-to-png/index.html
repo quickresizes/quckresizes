@@ -428,8 +428,10 @@
 
       let uploadedFile = null;
       let uploadedImage = null;
+      let originalObjectUrl = "";
       let convertedBlob = null;
       let convertedUrl = "";
+      let isConverting = false;
 
       const formatBytes = (bytes) => {
         if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -463,6 +465,23 @@
         return mimeType === "image/jpeg" || extension === "jpg" || extension === "jpeg";
       };
 
+      const hasJpegSignature = async (file) => {
+        try {
+          const headerBuffer = await file.slice(0, 3).arrayBuffer();
+          const bytes = new Uint8Array(headerBuffer);
+          return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+        } catch {
+          return false;
+        }
+      };
+
+      const revokeOriginalPreviewUrl = () => {
+        if (originalObjectUrl) {
+          URL.revokeObjectURL(originalObjectUrl);
+          originalObjectUrl = "";
+        }
+      };
+
       const resetConvertedState = () => {
         convertedBlob = null;
         if (convertedUrl) {
@@ -477,51 +496,55 @@
         downloadBtn.disabled = true;
       };
 
+      const setConverting = (value) => {
+        isConverting = value;
+        convertBtn.disabled = value || !uploadedImage;
+        convertBtn.textContent = value ? "Converting..." : "Convert to PNG";
+      };
+
       const setStatus = (message) => {
         statusMessage.textContent = message;
       };
 
-      const loadImage = (file) => {
+      const loadImage = async (file) => {
         if (!isJpgFile(file)) {
           setStatus("Please upload a JPG/JPEG image.");
           return;
         }
 
+        const hasValidHeader = await hasJpegSignature(file);
+        if (!hasValidHeader) {
+          setStatus("This file does not look like a valid JPG image.");
+          return;
+        }
+
         uploadedFile = file;
         resetConvertedState();
+        setConverting(false);
 
-        const reader = new FileReader();
-        reader.onload = () => {
-          const img = new Image();
-          img.onload = () => {
-            uploadedImage = img;
-            originalPreview.src = reader.result;
-            originalPreview.hidden = false;
-            originalPlaceholder.hidden = true;
+        revokeOriginalPreviewUrl();
+        const objectUrl = URL.createObjectURL(file);
+        originalObjectUrl = objectUrl;
+        originalPreview.src = objectUrl;
+        originalPreview.hidden = false;
+        originalPlaceholder.hidden = true;
 
-            originalName.textContent = file.name;
-            originalFormat.textContent = getFormatLabel(file);
-            originalDimensions.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
-            originalSize.textContent = formatBytes(file.size);
-            originalDetails.hidden = false;
+        try {
+          uploadedImage = await createImageBitmap(file);
 
-            setStatus("JPG loaded. Click Convert to PNG.");
-          };
+          originalName.textContent = file.name;
+          originalFormat.textContent = getFormatLabel(file);
+          originalDimensions.textContent = `${uploadedImage.width} × ${uploadedImage.height}`;
+          originalSize.textContent = formatBytes(file.size);
+          originalDetails.hidden = false;
+          convertBtn.disabled = false;
 
-          img.onerror = () => {
-            uploadedImage = null;
-            setStatus("Could not read the selected image.");
-          };
-
-          img.src = reader.result;
-        };
-
-        reader.onerror = () => {
+          setStatus("JPG detected and loaded. Click Convert to PNG.");
+        } catch {
           uploadedImage = null;
-          setStatus("Unable to open file.");
-        };
-
-        reader.readAsDataURL(file);
+          convertBtn.disabled = true;
+          setStatus("Could not decode the selected JPG image.");
+        }
       };
 
       const getImageFromClipboard = (event) => {
@@ -536,14 +559,16 @@
       };
 
       const convertToPng = () => {
-        if (!uploadedImage || !uploadedFile) {
+        if (!uploadedImage || !uploadedFile || isConverting) {
           setStatus("Upload a JPG image before converting.");
           return;
         }
 
+        const imageWidth = uploadedImage.naturalWidth || uploadedImage.width;
+        const imageHeight = uploadedImage.naturalHeight || uploadedImage.height;
         const canvas = document.createElement("canvas");
-        canvas.width = uploadedImage.naturalWidth;
-        canvas.height = uploadedImage.naturalHeight;
+        canvas.width = imageWidth;
+        canvas.height = imageHeight;
 
         const context = canvas.getContext("2d");
         if (!context) {
@@ -551,10 +576,12 @@
           return;
         }
 
-        context.drawImage(uploadedImage, 0, 0);
+        setConverting(true);
+        context.drawImage(uploadedImage, 0, 0, canvas.width, canvas.height);
 
         canvas.toBlob((blob) => {
           if (!blob) {
+            setConverting(false);
             setStatus("Conversion failed. Please try again.");
             return;
           }
@@ -573,6 +600,7 @@
           convertedSize.textContent = formatBytes(blob.size);
           convertedDetails.hidden = false;
           downloadBtn.disabled = false;
+          setConverting(false);
 
           setStatus("Converted successfully. Your PNG is ready to download.");
         }, "image/png");
@@ -658,8 +686,10 @@
       });
 
       document.getElementById("year").textContent = new Date().getFullYear();
+      convertBtn.disabled = true;
 
       window.addEventListener("beforeunload", () => {
+        revokeOriginalPreviewUrl();
         if (convertedUrl) {
           URL.revokeObjectURL(convertedUrl);
         }
