@@ -508,6 +508,14 @@
       let originalFile = null;
       let compressedBlob = null;
       let compressedUrl = null;
+      let sourceBitmap = null;
+      let sourceWidth = 0;
+      let sourceHeight = 0;
+      let compressionJobId = 0;
+      let activeCompressionJobId = 0;
+      let compressionFrameScheduled = false;
+      let canvas = null;
+      let canvasCtx = null;
 
       function formatBytes(bytes) {
         if (bytes === 0) {
@@ -530,6 +538,36 @@
           return type;
         }
         return "image/jpeg";
+      }
+
+      async function decodeImage(file) {
+        if (typeof createImageBitmap === "function") {
+          const bitmap = await createImageBitmap(file);
+          return { drawable: bitmap, width: bitmap.width, height: bitmap.height };
+        }
+
+        const sourceUrl = URL.createObjectURL(file);
+        try {
+          const image = await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error("Could not read image file."));
+            img.src = sourceUrl;
+          });
+          return { drawable: image, width: image.width, height: image.height };
+        } finally {
+          URL.revokeObjectURL(sourceUrl);
+        }
+      }
+
+      async function prepareSourceImage(file) {
+        if (sourceBitmap?.close) {
+          sourceBitmap.close();
+        }
+        const decoded = await decodeImage(file);
+        sourceBitmap = decoded.drawable;
+        sourceWidth = decoded.width;
+        sourceHeight = decoded.height;
       }
 
       function updateOriginalPreview(file) {
@@ -557,6 +595,9 @@
           URL.revokeObjectURL(compressedUrl);
           compressedUrl = null;
         }
+        compressionJobId += 1;
+        activeCompressionJobId = 0;
+        compressionFrameScheduled = false;
         compressedPreview.hidden = true;
         compressedPreview.removeAttribute("src");
         compressedPlaceholder.hidden = false;
@@ -564,23 +605,19 @@
         downloadButton.disabled = true;
       }
 
-      async function compressImage(file, compressionPercent) {
+      async function compressImage(file, compressionPercent, jobId) {
         const safePercent = Math.min(100, Math.max(10, Number(compressionPercent) || 80));
         const quality = safePercent / 100;
-        const sourceUrl = URL.createObjectURL(file);
-
-        const image = await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error("Could not read image file."));
-          img.src = sourceUrl;
-        });
-
-        const canvas = document.createElement("canvas");
-        canvas.width = image.width;
-        canvas.height = image.height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(image, 0, 0);
+        if (!sourceBitmap || sourceWidth === 0 || sourceHeight === 0) {
+          throw new Error("Image not ready for compression.");
+        }
+        if (!canvas) {
+          canvas = document.createElement("canvas");
+          canvasCtx = canvas.getContext("2d");
+        }
+        canvas.width = sourceWidth;
+        canvas.height = sourceHeight;
+        canvasCtx.drawImage(sourceBitmap, 0, 0);
 
         const mimeType = getOutputMimeType(file.type);
 
@@ -593,42 +630,27 @@
             }
           }, mimeType, quality);
         });
-
-        URL.revokeObjectURL(sourceUrl);
-
-        return { blob, mimeType, width: image.width, height: image.height };
+        if (jobId !== activeCompressionJobId) {
+          return null;
+        }
+        return { blob, mimeType };
       }
 
-      fileInput.addEventListener("change", () => {
-        originalFile = fileInput.files?.[0] || null;
-        if (!originalFile) {
-          originalPreview.hidden = true;
-          originalPreview.removeAttribute("src");
-          placeholders[0].hidden = false;
-          originalDetails.hidden = true;
-          resetCompressedResult();
+      async function runRealtimeCompression() {
+        if (!originalFile || !sourceBitmap) {
           return;
         }
-
-        updateOriginalPreview(originalFile);
-        resetCompressedResult();
-      });
-
-      compressionSlider.addEventListener("input", () => {
-        compressionDisplay.textContent = `Compression: ${compressionSlider.value}%`;
-      });
-
-      compressButton.addEventListener("click", async () => {
-        if (!originalFile) {
-          alert("Please upload an image first.");
-          return;
-        }
-
-        compressButton.disabled = true;
-        compressButton.textContent = "Compressing...";
+        const nextJobId = compressionJobId + 1;
+        compressionJobId = nextJobId;
+        activeCompressionJobId = nextJobId;
 
         try {
-          const { blob, mimeType } = await compressImage(originalFile, compressionSlider.value);
+          const result = await compressImage(originalFile, compressionSlider.value, nextJobId);
+          if (!result || activeCompressionJobId !== nextJobId || !originalFile) {
+            return;
+          }
+
+          const { blob, mimeType } = result;
           compressedBlob = blob;
           if (compressedUrl) {
             URL.revokeObjectURL(compressedUrl);
@@ -653,13 +675,62 @@
           compressedDetails.hidden = false;
           downloadButton.disabled = false;
         } catch (error) {
-          alert(error instanceof Error ? error.message : "Unable to compress image.");
+          if (activeCompressionJobId !== nextJobId) {
+            return;
+          }
+          console.error(error);
           resetCompressedResult();
-        } finally {
-          compressButton.disabled = false;
-          compressButton.textContent = "Compress Image";
+        }
+      }
+
+      function scheduleRealtimeCompression() {
+        if (!originalFile || !sourceBitmap || compressionFrameScheduled) {
+          return;
+        }
+        compressionFrameScheduled = true;
+        requestAnimationFrame(() => {
+          compressionFrameScheduled = false;
+          runRealtimeCompression();
+        });
+      }
+
+      fileInput.addEventListener("change", async () => {
+        originalFile = fileInput.files?.[0] || null;
+        if (sourceBitmap?.close) {
+          sourceBitmap.close();
+        }
+        sourceBitmap = null;
+        sourceWidth = 0;
+        sourceHeight = 0;
+        if (!originalFile) {
+          originalPreview.hidden = true;
+          originalPreview.removeAttribute("src");
+          placeholders[0].hidden = false;
+          originalDetails.hidden = true;
+          resetCompressedResult();
+          return;
+        }
+
+        updateOriginalPreview(originalFile);
+        resetCompressedResult();
+        try {
+          await prepareSourceImage(originalFile);
+          scheduleRealtimeCompression();
+        } catch (error) {
+          alert(error instanceof Error ? error.message : "Unable to read image.");
         }
       });
+
+      compressionSlider.addEventListener("input", () => {
+        compressionDisplay.textContent = `Compression: ${compressionSlider.value}%`;
+        if (!originalFile) {
+          return;
+        }
+        scheduleRealtimeCompression();
+      });
+
+      compressButton.disabled = true;
+      compressButton.textContent = "Auto-compressing with slider";
 
       downloadButton.addEventListener("click", () => {
         if (!compressedBlob || !originalFile) {
