@@ -159,8 +159,7 @@
         font-weight: 600;
       }
 
-      input[type="file"],
-      select {
+      input[type="file"] {
         width: 100%;
         border: 1px solid var(--input-border);
         border-radius: 10px;
@@ -176,10 +175,37 @@
       }
 
       input:focus-visible,
-      select:focus-visible,
       button:focus-visible {
         outline: 3px solid rgba(37, 99, 235, 0.22);
         outline-offset: 1px;
+      }
+
+      .compression-control {
+        border: 1px solid var(--input-border);
+        background: var(--input-bg);
+        border-radius: 12px;
+        padding: 0.85rem 0.9rem;
+      }
+
+      .compression-display {
+        margin: 0 0 0.7rem;
+        color: var(--preview-label);
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+
+      .compression-slider {
+        width: 100%;
+        accent-color: var(--primary);
+        min-height: 42px;
+        margin: 0;
+        touch-action: pan-y;
+      }
+
+      .compression-hint {
+        margin: 0.55rem 0 0;
+        color: var(--muted);
+        font-size: 0.84rem;
       }
 
       .button-row {
@@ -373,7 +399,7 @@
       <section class="compressor-card" aria-labelledby="compressor-heading">
         <h1 id="compressor-heading">Image Compressor</h1>
         <p class="subtext">
-          Upload an image, choose a compression level, and generate a smaller file for faster sharing.
+          Upload an image, adjust compression, and generate a smaller file for faster sharing.
         </p>
 
         <form class="form-grid" action="#" method="post">
@@ -383,12 +409,21 @@
           </div>
 
           <div>
-            <label for="compressionLevel">Compression level</label>
-            <select id="compressionLevel" name="compressionLevel">
-              <option value="low">Low (better quality, larger file)</option>
-              <option value="medium" selected>Medium (balanced)</option>
-              <option value="high">High (smaller file, lower quality)</option>
-            </select>
+            <label for="compressionSlider">Compression</label>
+            <div class="compression-control">
+              <p class="compression-display" id="compressionDisplay">Compression: 80%</p>
+              <input
+                id="compressionSlider"
+                class="compression-slider"
+                name="compressionSlider"
+                type="range"
+                min="10"
+                max="100"
+                value="80"
+                step="1"
+              />
+              <p class="compression-hint">Lower % = more compression (smaller file). Higher % = better quality.</p>
+            </div>
           </div>
 
           <div class="button-row">
@@ -450,7 +485,8 @@
 
     <script>
       const fileInput = document.getElementById("imageUpload");
-      const levelSelect = document.getElementById("compressionLevel");
+      const compressionSlider = document.getElementById("compressionSlider");
+      const compressionDisplay = document.getElementById("compressionDisplay");
       const compressButton = document.querySelector(".compress-btn");
       const downloadButton = document.querySelector(".download-btn");
       const originalPreview = document.querySelector(".original-preview");
@@ -472,12 +508,6 @@
       let originalFile = null;
       let compressedBlob = null;
       let compressedUrl = null;
-
-      const compressionMap = {
-        low: 0.82,
-        medium: 0.64,
-        high: 0.45,
-      };
 
       function formatBytes(bytes) {
         if (bytes === 0) {
@@ -534,8 +564,9 @@
         downloadButton.disabled = true;
       }
 
-      async function compressImage(file, level) {
-        const quality = compressionMap[level] ?? compressionMap.medium;
+      async function compressImage(file, compressionPercent) {
+        const safePercent = Math.min(100, Math.max(10, Number(compressionPercent) || 80));
+        const quality = safePercent / 100;
         const sourceUrl = URL.createObjectURL(file);
 
         const image = await new Promise((resolve, reject) => {
@@ -583,6 +614,10 @@
         resetCompressedResult();
       });
 
+      compressionSlider.addEventListener("input", () => {
+        compressionDisplay.textContent = `Compression: ${compressionSlider.value}%`;
+      });
+
       compressButton.addEventListener("click", async () => {
         if (!originalFile) {
           alert("Please upload an image first.");
@@ -593,7 +628,7 @@
         compressButton.textContent = "Compressing...";
 
         try {
-          const { blob, mimeType } = await compressImage(originalFile, levelSelect.value);
+          const { blob, mimeType } = await compressImage(originalFile, compressionSlider.value);
           compressedBlob = blob;
           if (compressedUrl) {
             URL.revokeObjectURL(compressedUrl);
@@ -647,6 +682,7 @@
       });
 
       year.textContent = new Date().getFullYear();
+      compressionDisplay.textContent = `Compression: ${compressionSlider.value}%`;
       setTheme(localStorage.getItem("qrTheme") || "light");
     </script>
   </body>
