@@ -150,6 +150,29 @@
         margin-bottom: 1rem;
       }
 
+      .tools-search {
+        position: relative;
+        margin-bottom: 1rem;
+      }
+
+      .tools-search input {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        background: var(--surface);
+        color: var(--text);
+        font-size: 1rem;
+        box-shadow: var(--shadow);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .tools-search input:focus-visible {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+      }
+
       .tools-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -184,6 +207,15 @@
       .tool-desc {
         color: var(--muted);
         margin: 0;
+      }
+
+      .no-results {
+        margin: 0;
+        padding: 1.2rem;
+        border-radius: 12px;
+        border: 1px dashed var(--border);
+        color: var(--muted);
+        background: color-mix(in srgb, var(--surface) 94%, transparent);
       }
 
       footer {
@@ -255,7 +287,7 @@
 
     <main class="container">
       <section class="hero" aria-labelledby="home-title">
-        <h1 id="home-title">Smart, Fast & Reliable Media Utilities</h1>
+        <h1 id="home-title">Smart, Fast &amp; Reliable Media Utilities</h1>
         <p>
           QuickResizes provides streamlined online tools to help you optimize, resize,
           and manage media in seconds. Built for creators, teams, and everyday users.
@@ -264,20 +296,16 @@
 
       <section class="tools" aria-labelledby="tools-title">
         <h2 id="tools-title">Our Tools</h2>
-        <div class="tools-grid">
-          <a class="tool-card" href="tools/image-resizer/index.html">
-            <div class="tool-title">Image Resizer</div>
-            <p class="tool-desc">
-              Resize images quickly with a clean workflow and quality-focused output.
-            </p>
-          </a>
-          <a class="tool-card" href="tools/image-compressor/index.html">
-            <div class="tool-title">Image Compressor</div>
-            <p class="tool-desc">
-              Compress images fast while balancing file size and visual quality.
-            </p>
-          </a>
+        <div class="tools-search">
+          <input
+            id="toolSearch"
+            type="search"
+            placeholder="Search tools..."
+            aria-label="Search tools"
+            autocomplete="off"
+          />
         </div>
+        <div id="toolsGrid" class="tools-grid"></div>
       </section>
     </main>
 
@@ -315,6 +343,63 @@
         localStorage.setItem(themeStorageKey, nextTheme);
       });
 
+      const tools = [
+        {
+          name: "Image Resizer",
+          description: "Resize images quickly with a clean workflow and quality-focused output.",
+          href: "tools/image-resizer/index.html",
+          keywords: ["resize", "image", "dimensions"],
+        },
+        {
+          name: "Image Compressor",
+          description: "Compress images fast while balancing file size and visual quality.",
+          href: "tools/image-compressor/index.html",
+          keywords: ["compress", "image", "optimize", "size"],
+        },
+      ];
+
+      const toolSearchInput = document.getElementById("toolSearch");
+      const toolsGrid = document.getElementById("toolsGrid");
+
+      function renderTools(filteredTools) {
+        if (!filteredTools.length) {
+          toolsGrid.innerHTML = '<p class="no-results">No matching tools found.</p>';
+          return;
+        }
+
+        toolsGrid.innerHTML = filteredTools
+          .map(
+            (tool) => `
+              <a class="tool-card" href="${tool.href}">
+                <div class="tool-title">${tool.name}</div>
+                <p class="tool-desc">${tool.description}</p>
+              </a>
+            `
+          )
+          .join("");
+      }
+
+      function filterTools(query) {
+        const normalizedQuery = query.trim().toLowerCase();
+
+        if (!normalizedQuery) {
+          renderTools(tools);
+          return;
+        }
+
+        const filtered = tools.filter((tool) => {
+          const searchableText = `${tool.name} ${tool.description} ${tool.keywords.join(" ")}`.toLowerCase();
+          return searchableText.includes(normalizedQuery);
+        });
+
+        renderTools(filtered);
+      }
+
+      toolSearchInput.addEventListener("input", (event) => {
+        filterTools(event.target.value);
+      });
+
+      renderTools(tools);
       document.getElementById("year").textContent = new Date().getFullYear();
     </script>
   </body>
