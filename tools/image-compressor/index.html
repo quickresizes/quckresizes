@@ -174,6 +174,28 @@
         padding: 0.52rem 0.65rem;
       }
 
+      .upload-drop-area {
+        border: 2px dashed var(--input-border);
+        border-radius: 12px;
+        background: var(--preview-bg);
+        padding: clamp(1rem, 2.5vw, 1.2rem);
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.18s ease, background-color 0.18s ease;
+      }
+
+      .upload-drop-area p {
+        margin: 0;
+        font-size: clamp(0.9rem, 1.8vw, 0.98rem);
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .upload-drop-area.drag-active {
+        border-color: var(--primary);
+        background: rgba(37, 99, 235, 0.08);
+      }
+
       input:focus-visible,
       button:focus-visible {
         outline: 3px solid rgba(37, 99, 235, 0.22);
@@ -405,6 +427,9 @@
         <form class="form-grid" action="#" method="post">
           <div>
             <label for="imageUpload">Upload image</label>
+            <div class="upload-drop-area" id="uploadDropArea" tabindex="0" role="button" aria-label="Upload image">
+              <p>Drag &amp; Drop or Paste Image or Click to Upload</p>
+            </div>
             <input id="imageUpload" name="imageUpload" type="file" accept="image/*" />
           </div>
 
@@ -485,6 +510,7 @@
 
     <script>
       const fileInput = document.getElementById("imageUpload");
+      const uploadDropArea = document.getElementById("uploadDropArea");
       const compressionSlider = document.getElementById("compressionSlider");
       const compressionDisplay = document.getElementById("compressionDisplay");
       const compressButton = document.querySelector(".compress-btn");
@@ -516,6 +542,21 @@
       let compressionFrameScheduled = false;
       let canvas = null;
       let canvasCtx = null;
+
+      function resetOriginalResult() {
+        originalFile = null;
+        if (sourceBitmap?.close) {
+          sourceBitmap.close();
+        }
+        sourceBitmap = null;
+        sourceWidth = 0;
+        sourceHeight = 0;
+        originalPreview.hidden = true;
+        originalPreview.removeAttribute("src");
+        placeholders[0].hidden = false;
+        originalDetails.hidden = true;
+        resetCompressedResult();
+      }
 
       function formatBytes(bytes) {
         if (bytes === 0) {
@@ -568,6 +609,23 @@
         sourceBitmap = decoded.drawable;
         sourceWidth = decoded.width;
         sourceHeight = decoded.height;
+      }
+
+      async function handleSelectedFile(file) {
+        if (!file || !file.type.startsWith("image/")) {
+          resetOriginalResult();
+          return;
+        }
+        originalFile = file;
+        updateOriginalPreview(originalFile);
+        resetCompressedResult();
+        try {
+          await prepareSourceImage(originalFile);
+          scheduleRealtimeCompression();
+        } catch (error) {
+          alert(error instanceof Error ? error.message : "Unable to read image.");
+          resetOriginalResult();
+        }
       }
 
       function updateOriginalPreview(file) {
@@ -695,29 +753,62 @@
       }
 
       fileInput.addEventListener("change", async () => {
-        originalFile = fileInput.files?.[0] || null;
-        if (sourceBitmap?.close) {
-          sourceBitmap.close();
+        const file = fileInput.files?.[0] || null;
+        await handleSelectedFile(file);
+      });
+
+      uploadDropArea.addEventListener("click", () => {
+        fileInput.click();
+      });
+
+      uploadDropArea.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          fileInput.click();
         }
-        sourceBitmap = null;
-        sourceWidth = 0;
-        sourceHeight = 0;
-        if (!originalFile) {
-          originalPreview.hidden = true;
-          originalPreview.removeAttribute("src");
-          placeholders[0].hidden = false;
-          originalDetails.hidden = true;
-          resetCompressedResult();
+      });
+
+      ["dragenter", "dragover"].forEach((eventName) => {
+        uploadDropArea.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          uploadDropArea.classList.add("drag-active");
+        });
+      });
+
+      ["dragleave", "dragend"].forEach((eventName) => {
+        uploadDropArea.addEventListener(eventName, () => {
+          uploadDropArea.classList.remove("drag-active");
+        });
+      });
+
+      uploadDropArea.addEventListener("drop", async (event) => {
+        event.preventDefault();
+        uploadDropArea.classList.remove("drag-active");
+        const [file] = event.dataTransfer?.files || [];
+        if (!file) {
           return;
         }
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        fileInput.files = transfer.files;
+        await handleSelectedFile(file);
+      });
 
-        updateOriginalPreview(originalFile);
-        resetCompressedResult();
-        try {
-          await prepareSourceImage(originalFile);
-          scheduleRealtimeCompression();
-        } catch (error) {
-          alert(error instanceof Error ? error.message : "Unable to read image.");
+      document.addEventListener("paste", async (event) => {
+        const items = event.clipboardData?.items || [];
+        for (const item of items) {
+          if (!item.type.startsWith("image/")) {
+            continue;
+          }
+          const file = item.getAsFile();
+          if (!file) {
+            continue;
+          }
+          const transfer = new DataTransfer();
+          transfer.items.add(file);
+          fileInput.files = transfer.files;
+          await handleSelectedFile(file);
+          break;
         }
       });
 
