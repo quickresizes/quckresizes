@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://quckresizes.github.io/quckresizes/sitemap.xml
