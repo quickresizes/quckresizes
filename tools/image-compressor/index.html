@@ -420,7 +420,8 @@
               <div class="details-box compressed-details" hidden>
                 <ul class="details-list">
                   <li><span class="details-key">Format</span><span class="detail-value compressed-format"></span></li>
-                  <li><span class="details-key">File Size</span><span class="detail-value compressed-size"></span></li>
+                  <li><span class="details-key">Before Size</span><span class="detail-value before-size"></span></li>
+                  <li><span class="details-key">After Size</span><span class="detail-value compressed-size"></span></li>
                   <li><span class="details-key">Savings</span><span class="detail-value compressed-savings"></span></li>
                 </ul>
               </div>
@@ -462,6 +463,7 @@
       const originalDimensions = document.querySelector(".original-dimensions");
       const originalSize = document.querySelector(".original-size");
       const compressedFormat = document.querySelector(".compressed-format");
+      const beforeSize = document.querySelector(".before-size");
       const compressedSize = document.querySelector(".compressed-size");
       const compressedSavings = document.querySelector(".compressed-savings");
       const themeToggle = document.getElementById("themeToggle");
@@ -469,6 +471,7 @@
 
       let originalFile = null;
       let compressedBlob = null;
+      let compressedUrl = null;
 
       const compressionMap = {
         low: 0.82,
@@ -520,6 +523,10 @@
 
       function resetCompressedResult() {
         compressedBlob = null;
+        if (compressedUrl) {
+          URL.revokeObjectURL(compressedUrl);
+          compressedUrl = null;
+        }
         compressedPreview.hidden = true;
         compressedPreview.removeAttribute("src");
         compressedPlaceholder.hidden = false;
@@ -588,7 +595,10 @@
         try {
           const { blob, mimeType } = await compressImage(originalFile, levelSelect.value);
           compressedBlob = blob;
-          const compressedUrl = URL.createObjectURL(blob);
+          if (compressedUrl) {
+            URL.revokeObjectURL(compressedUrl);
+          }
+          compressedUrl = URL.createObjectURL(blob);
 
           compressedPreview.src = compressedUrl;
           compressedPreview.hidden = false;
@@ -598,6 +608,7 @@
           const savingsPercent = (sizeDiff / originalFile.size) * 100;
 
           compressedFormat.textContent = mimeType.replace("image/", "").toUpperCase();
+          beforeSize.textContent = formatBytes(originalFile.size);
           compressedSize.textContent = formatBytes(blob.size);
           compressedSavings.textContent =
             sizeDiff > 0
