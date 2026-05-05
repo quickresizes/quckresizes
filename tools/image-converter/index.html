@@ -5,6 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Image Converter | QuickResizes</title>
     <link rel="stylesheet" href="../../assets/css/style.css" />
+    <style>
+      .quality-wrap { margin-top: 0.6rem; }
+      .quality-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+      #qualityValue { font-weight: 600; color: var(--primary); min-width: 3.25rem; text-align: right; }
+      #quality { width: 100%; margin-top: 0.45rem; }
+      .small-note { font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem; }
+      .form-note { font-size: 0.85rem; color: #cc5252; margin-top: 0.4rem; min-height: 1.2em; }
+      .preview-image { transition: opacity 240ms ease; opacity: 1; }
+      .preview-image.updating { opacity: 0.1; }
+      .is-loading { position: relative; pointer-events: none; opacity: 0.8; }
+      .is-loading::after {
+        content: 'Converting...';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        padding: 0.55rem 0.9rem;
+        border-radius: 999px;
+        font-size: 0.86rem;
+        letter-spacing: 0.02em;
+      }
+    </style>
   </head>
   <body>
     <header class="site-header"><div class="header-inner"><div class="brand">QuickResizes</div><button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button></div></header>
@@ -16,54 +40,153 @@
           <div>
             <label for="fileInput">Upload image</label>
             <div class="upload-drop-area" id="uploadBox" tabindex="0" role="button" aria-label="Upload image"><p>Drag &amp; Drop or Paste Image or Click to Upload</p></div>
-            <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/*" />
+            <input id="fileInput" type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/bmp,image/gif,image/*" />
           </div>
           <div>
             <label for="format">Convert to</label>
-            <select id="format"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select>
+            <select id="format">
+              <option value="image/jpeg">JPG</option>
+              <option value="image/jpeg">JPEG</option>
+              <option value="image/png">PNG</option>
+              <option value="image/webp">WebP</option>
+              <option value="image/bmp">BMP</option>
+              <option value="image/gif">GIF (Static)</option>
+            </select>
+            <div class="quality-wrap" id="qualityWrap">
+              <div class="quality-row">
+                <label for="quality">Quality</label>
+                <span id="qualityValue">92%</span>
+              </div>
+              <input id="quality" type="range" min="10" max="100" step="1" value="92" />
+              <p class="small-note" id="qualityNote">Used for JPG/JPEG and WebP outputs.</p>
+            </div>
+            <p class="form-note" id="statusNote" role="status" aria-live="polite"></p>
           </div>
           <div class="button-row"><button id="convertBtn" class="compress-btn" type="button" disabled>Convert Image</button></div>
         </form>
 
         <div class="preview-grid" aria-live="polite">
           <div class="preview-area"><div class="preview-content"><p class="preview-label">Original Image</p><p class="preview-placeholder" id="origPlaceholder">Image preview will appear here</p><img class="preview-image" id="originalPreview" alt="Original preview" hidden /><div class="details-box" id="originalDetails" hidden><ul class="details-list"><li><span class="details-key">Format</span><span class="detail-value" id="origFormat">-</span></li><li><span class="details-key">File Size</span><span class="detail-value" id="origSize">-</span></li></ul></div></div></div>
-          <div class="preview-area"><div class="preview-content"><p class="preview-label">Converted Image</p><p class="preview-placeholder" id="convPlaceholder">Converted image preview will appear here</p><img class="preview-image" id="convertedPreview" alt="Converted preview" hidden /><div class="details-box" id="convertedDetails" hidden><ul class="details-list"><li><span class="details-key">Format</span><span class="detail-value" id="convFormat">-</span></li><li><span class="details-key">File Size</span><span class="detail-value" id="convSize">-</span></li><li><span class="details-key">Savings</span><span class="detail-value" id="reduction">-</span></li></ul></div></div></div>
+          <div class="preview-area" id="convertedArea"><div class="preview-content"><p class="preview-label">Converted Image</p><p class="preview-placeholder" id="convPlaceholder">Converted image preview will appear here</p><img class="preview-image" id="convertedPreview" alt="Converted preview" hidden /><div class="details-box" id="convertedDetails" hidden><ul class="details-list"><li><span class="details-key">Original Format</span><span class="detail-value" id="infoOrigFormat">-</span></li><li><span class="details-key">Converted Format</span><span class="detail-value" id="convFormat">-</span></li><li><span class="details-key">Original Size</span><span class="detail-value" id="infoOrigSize">-</span></li><li><span class="details-key">Converted Size</span><span class="detail-value" id="convSize">-</span></li><li><span class="details-key">Reduction</span><span class="detail-value" id="reduction">-</span></li></ul></div></div></div>
           <div class="button-row"><button id="downloadBtn" class="download-btn" type="button" disabled>Download Image</button></div>
         </div>
       </section>
     </main>
 
     <script>
-      const uploadBox = document.getElementById('uploadBox');
-      const fileInput = document.getElementById('fileInput');
-      const formatSelect = document.getElementById('format');
-      const convertBtn = document.getElementById('convertBtn');
-      const downloadBtn = document.getElementById('downloadBtn');
-      const themeToggle = document.getElementById('themeToggle');
-      const originalPreview = document.getElementById('originalPreview');
-      const convertedPreview = document.getElementById('convertedPreview');
-      const origPlaceholder = document.getElementById('origPlaceholder');
-      const convPlaceholder = document.getElementById('convPlaceholder');
-      const originalDetails = document.getElementById('originalDetails');
-      const convertedDetails = document.getElementById('convertedDetails');
-      let originalFile, convertedBlob;
+      const state = { originalFile: null, convertedBlob: null, outputUrl: '', inputUrl: '' };
+      const dom = {
+        uploadBox: document.getElementById('uploadBox'), fileInput: document.getElementById('fileInput'),
+        formatSelect: document.getElementById('format'), convertBtn: document.getElementById('convertBtn'), downloadBtn: document.getElementById('downloadBtn'),
+        qualityInput: document.getElementById('quality'), qualityValue: document.getElementById('qualityValue'), qualityWrap: document.getElementById('qualityWrap'),
+        statusNote: document.getElementById('statusNote'), themeToggle: document.getElementById('themeToggle'), originalPreview: document.getElementById('originalPreview'),
+        convertedPreview: document.getElementById('convertedPreview'), origPlaceholder: document.getElementById('origPlaceholder'), convPlaceholder: document.getElementById('convPlaceholder'),
+        originalDetails: document.getElementById('originalDetails'), convertedDetails: document.getElementById('convertedDetails'), convertedArea: document.getElementById('convertedArea')
+      };
 
-      const friendly = (m) => ({'image/jpeg':'JPG','image/png':'PNG','image/webp':'WebP'}[m] || '-');
+      const formatMap = {
+        'image/jpeg': { label: 'JPG', ext: 'jpg', quality: true },
+        'image/png': { label: 'PNG', ext: 'png', quality: false },
+        'image/webp': { label: 'WebP', ext: 'webp', quality: true },
+        'image/bmp': { label: 'BMP', ext: 'bmp', quality: false },
+        'image/gif': { label: 'GIF', ext: 'gif', quality: false }
+      };
+
+      const normalize = (mime) => (mime === 'image/jpg' ? 'image/jpeg' : mime);
+      const friendly = (mime) => (formatMap[normalize(mime)] || {}).label || '-';
       const bytes = (n)=>{if(n===0)return'0 B';const u=['B','KB','MB'];const i=Math.min(Math.floor(Math.log(n)/Math.log(1024)),u.length-1);const v=n/1024**i;return `${v.toFixed(v>=10||i===0?0:1)} ${u[i]}`};
-      function setTheme(theme){document.documentElement.setAttribute('data-theme',theme);localStorage.setItem('qrTheme',theme);themeToggle.textContent=theme==='dark'?'☀️ Light':'🌙 Dark'}
+
+      function setTheme(theme){document.documentElement.setAttribute('data-theme',theme);localStorage.setItem('qrTheme',theme);dom.themeToggle.textContent=theme==='dark'?'☀️ Light':'🌙 Dark'}
+      function updateQualityUI() {
+        const show = ['image/jpeg', 'image/webp'].includes(normalize(dom.formatSelect.value));
+        dom.qualityWrap.style.display = show ? 'block' : 'none';
+        dom.qualityValue.textContent = `${dom.qualityInput.value}%`;
+      }
+      function canConvert() {
+        return !!state.originalFile && normalize(state.originalFile.type) !== normalize(dom.formatSelect.value);
+      }
+      function updateConvertState() {
+        dom.convertBtn.disabled = !canConvert();
+        dom.statusNote.textContent = state.originalFile && !canConvert() ? 'Selected output matches original format.' : '';
+      }
+      function revokeUrl(type) {
+        if (type === 'input' && state.inputUrl) { URL.revokeObjectURL(state.inputUrl); state.inputUrl = ''; }
+        if (type === 'output' && state.outputUrl) { URL.revokeObjectURL(state.outputUrl); state.outputUrl = ''; }
+      }
+      function setLoading(isLoading) {
+        dom.convertBtn.disabled = isLoading || !canConvert();
+        dom.convertedArea.classList.toggle('is-loading', isLoading);
+      }
+      function updateOriginalInfo(file) {
+        document.getElementById('origFormat').textContent = friendly(file.type);
+        document.getElementById('origSize').textContent = bytes(file.size);
+      }
+      function updateConvertedInfo(outType, outSize) {
+        document.getElementById('infoOrigFormat').textContent = friendly(state.originalFile.type);
+        document.getElementById('convFormat').textContent = friendly(outType);
+        document.getElementById('infoOrigSize').textContent = bytes(state.originalFile.size);
+        document.getElementById('convSize').textContent = bytes(outSize);
+        const pct=state.originalFile.size?Math.round((1-outSize/state.originalFile.size)*100):0;
+        document.getElementById('reduction').textContent=`${pct}%`;
+      }
+
+      function handleFile(file){
+        if(!file||!file.type.startsWith('image/')) return;
+        state.originalFile = file; state.convertedBlob = null; revokeUrl('output');
+        revokeUrl('input'); state.inputUrl = URL.createObjectURL(file);
+        dom.originalPreview.src = state.inputUrl; dom.originalPreview.hidden = false; dom.origPlaceholder.hidden = true; dom.originalDetails.hidden = false;
+        updateOriginalInfo(file);
+        dom.convPlaceholder.hidden = false; dom.convertedPreview.hidden = true; dom.convertedDetails.hidden = true;
+        dom.downloadBtn.disabled = true; updateConvertState();
+      }
+
+      async function convertImage() {
+        if (!canConvert()) return;
+        setLoading(true); dom.statusNote.textContent = '';
+        try {
+          const bitmap = await createImageBitmap(state.originalFile);
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width; canvas.height = bitmap.height;
+          canvas.getContext('2d').drawImage(bitmap,0,0);
+          const mime = normalize(dom.formatSelect.value);
+          const q = Number(dom.qualityInput.value) / 100;
+          const quality = formatMap[mime].quality ? q : undefined;
+          state.convertedBlob = await new Promise(r=>canvas.toBlob(r,mime,quality));
+          if (!state.convertedBlob) throw new Error('Conversion failed');
+          revokeUrl('output'); state.outputUrl = URL.createObjectURL(state.convertedBlob);
+          dom.convertedPreview.classList.add('updating');
+          dom.convertedPreview.src = state.outputUrl;
+          dom.convertedPreview.hidden = false; dom.convPlaceholder.hidden = true; dom.convertedDetails.hidden = false;
+          requestAnimationFrame(() => dom.convertedPreview.classList.remove('updating'));
+          updateConvertedInfo(mime, state.convertedBlob.size);
+          dom.downloadBtn.disabled = false;
+        } catch (e) {
+          dom.statusNote.textContent = 'Could not convert this file in your browser.';
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      function downloadImage() {
+        if(!state.convertedBlob) return;
+        const mime = normalize(dom.formatSelect.value);
+        const ext = (formatMap[mime] || {}).ext || 'img';
+        const a = document.createElement('a'); a.href = state.outputUrl; a.download = `converted.${ext}`; a.click();
+      }
+
       setTheme(localStorage.getItem('qrTheme')||'light');
-      themeToggle.addEventListener('click',()=>setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'));
-
-      function handleFile(file){ if(!file||!file.type.startsWith('image/')) return; originalFile=file; convertedBlob=null; convertBtn.disabled=false; downloadBtn.disabled=true; const url=URL.createObjectURL(file); originalPreview.src=url; originalPreview.hidden=false; origPlaceholder.hidden=true; originalDetails.hidden=false; document.getElementById('origFormat').textContent=friendly(file.type); document.getElementById('origSize').textContent=bytes(file.size); convPlaceholder.hidden=false; convertedPreview.hidden=true; convertedDetails.hidden=true; }
-      fileInput.addEventListener('change',e=>handleFile(e.target.files[0]));
-      uploadBox.addEventListener('click',()=>fileInput.click());
-      uploadBox.addEventListener('dragover',e=>{e.preventDefault();uploadBox.classList.add('drag-active')});
-      uploadBox.addEventListener('dragleave',()=>uploadBox.classList.remove('drag-active'));
-      uploadBox.addEventListener('drop',e=>{e.preventDefault();uploadBox.classList.remove('drag-active');handleFile(e.dataTransfer.files[0])});
+      dom.themeToggle.addEventListener('click',()=>setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'));
+      dom.fileInput.addEventListener('change',e=>handleFile(e.target.files[0]));
+      dom.uploadBox.addEventListener('click',()=>dom.fileInput.click());
+      dom.uploadBox.addEventListener('dragover',e=>{e.preventDefault();dom.uploadBox.classList.add('drag-active')});
+      dom.uploadBox.addEventListener('dragleave',()=>dom.uploadBox.classList.remove('drag-active'));
+      dom.uploadBox.addEventListener('drop',e=>{e.preventDefault();dom.uploadBox.classList.remove('drag-active');handleFile(e.dataTransfer.files[0])});
       document.addEventListener('paste',e=>{const f=[...e.clipboardData.items].find(i=>i.type.startsWith('image/'));if(f)handleFile(f.getAsFile())});
-
-      convertBtn.addEventListener('click', async ()=>{ if(!originalFile) return; const bitmap=await createImageBitmap(originalFile); const canvas=document.createElement('canvas'); canvas.width=bitmap.width; canvas.height=bitmap.height; canvas.getContext('2d').drawImage(bitmap,0,0); const mime=formatSelect.value; convertedBlob=await new Promise(r=>canvas.toBlob(r,mime,mime==='image/png'?undefined:0.92)); if(!convertedBlob) return; const outUrl=URL.createObjectURL(convertedBlob); convertedPreview.src=outUrl; convertedPreview.hidden=false; convPlaceholder.hidden=true; convertedDetails.hidden=false; document.getElementById('convFormat').textContent=friendly(mime); document.getElementById('convSize').textContent=bytes(convertedBlob.size); const pct=originalFile.size?Math.round((1-convertedBlob.size/originalFile.size)*100):0; document.getElementById('reduction').textContent=`${pct}%`; downloadBtn.disabled=false; });
-      downloadBtn.addEventListener('click',()=>{ if(!convertedBlob) return; const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[formatSelect.value]||'img'; const a=document.createElement('a'); a.href=URL.createObjectURL(convertedBlob); a.download=`converted.${ext}`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
+      dom.formatSelect.addEventListener('change', () => { updateQualityUI(); updateConvertState(); });
+      dom.qualityInput.addEventListener('input', updateQualityUI);
+      dom.convertBtn.addEventListener('click', convertImage);
+      dom.downloadBtn.addEventListener('click', downloadImage);
+      updateQualityUI();
     </script>
   </body>
 </html>
