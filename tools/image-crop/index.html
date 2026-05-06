@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Crop Tool | QuickResizes</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fb;
+        --bg-gradient-start: #f8faff;
+        --surface: #ffffff;
+        --surface-border: #e5e9f2;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #2563eb;
+        --primary-hover: #1d4ed8;
+        --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+        --header-border: rgba(229, 233, 242, 0.85);
+        --header-bg: rgba(255, 255, 255, 0.92);
+        --input-bg: #fff;
+        --input-border: #d6dbe8;
+        --preview-border: #cbd5e1;
+        --preview-bg: #f9fbff;
+        --preview-label: #374151;
+        --details-border: #dbe5f5;
+        --details-bg: #ffffff;
+        --details-text: #334155;
+        --details-key: #64748b;
+        --secondary-btn-border: #bfdbfe;
+        --secondary-btn-bg: #eff6ff;
+        --secondary-btn-text: #1d4ed8;
+        --toggle-bg: #e2e8f0;
+        --toggle-text: #0f172a;
+        --crop-mask: rgba(15, 23, 42, 0.42);
+        --crop-border: #f8fafc;
+        --radius: 18px;
+        --space-2: clamp(1rem, 2vw, 1.25rem);
+        --space-3: clamp(1.25rem, 2.8vw, 1.75rem);
+      }
+
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #020617;
+        --bg-gradient-start: #0b1220;
+        --surface: #0f172a;
+        --surface-border: #1e293b;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --primary: #60a5fa;
+        --primary-hover: #3b82f6;
+        --shadow: 0 16px 40px rgba(2, 6, 23, 0.52);
+        --header-border: rgba(30, 41, 59, 0.9);
+        --header-bg: rgba(15, 23, 42, 0.92);
+        --input-bg: #0b1220;
+        --input-border: #334155;
+        --preview-border: #334155;
+        --preview-bg: #0b1220;
+        --preview-label: #cbd5e1;
+        --details-border: #334155;
+        --details-bg: #0b1220;
+        --details-text: #cbd5e1;
+        --details-key: #94a3b8;
+        --secondary-btn-border: #334155;
+        --secondary-btn-bg: #1e293b;
+        --secondary-btn-text: #bfdbfe;
+        --toggle-bg: #1e293b;
+        --toggle-text: #e2e8f0;
+        --crop-mask: rgba(2, 6, 23, 0.58);
+        --crop-border: #dbeafe;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text);
+        background: linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg) 100%);
+        min-height: 100vh;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        width: 100%;
+        border-bottom: 1px solid var(--header-border);
+        background: var(--header-bg);
+        backdrop-filter: blur(8px);
+      }
+
+      .header-inner {
+        max-width: 1080px;
+        margin: 0 auto;
+        width: min(100%, 1080px);
+        padding: 1rem clamp(1rem, 2.5vw, 1.5rem);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .brand {
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .theme-toggle {
+        border: 1px solid var(--surface-border);
+        background: var(--toggle-bg);
+        color: var(--toggle-text);
+        border-radius: 999px;
+        min-height: 38px;
+        padding: 0.35rem 0.8rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      main {
+        display: grid;
+        place-items: center;
+        min-height: calc(100vh - 72px);
+        width: 100%;
+        padding: clamp(1rem, 3vw, 2.25rem) clamp(0.9rem, 3vw, 1.4rem) clamp(1.5rem, 4vw, 3rem);
+      }
+
+      .crop-card {
+        width: min(100%, 860px);
+        background: var(--surface);
+        border: 1px solid var(--surface-border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: clamp(1.1rem, 3vw, 2rem);
+      }
+
+      .crop-card h1 {
+        margin: 0 0 0.75rem;
+        font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+      }
+
+      .subtext {
+        margin: 0 0 var(--space-3);
+        color: var(--muted);
+        font-size: clamp(0.92rem, 1.8vw, 1rem);
+        line-height: 1.55;
+        max-width: 65ch;
+      }
+
+      .form-grid,
+      .preview-grid {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      label {
+        display: block;
+        margin-bottom: 0.45rem;
+        font-size: clamp(0.88rem, 1.6vw, 0.93rem);
+        font-weight: 600;
+      }
+
+      input[type="file"] {
+        width: 100%;
+        border: 1px solid var(--input-border);
+        border-radius: 10px;
+        background: var(--input-bg);
+        color: var(--text);
+        min-height: 44px;
+        padding: 0.52rem 0.65rem;
+        font-size: clamp(0.92rem, 1.8vw, 0.98rem);
+      }
+
+      .upload-drop-area {
+        border: 2px dashed var(--input-border);
+        border-radius: 12px;
+        background: var(--preview-bg);
+        padding: clamp(1rem, 2.5vw, 1.2rem);
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.18s ease, background-color 0.18s ease;
+      }
+
+      .upload-drop-area p {
+        margin: 0;
+        font-size: clamp(0.9rem, 1.8vw, 0.98rem);
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .upload-drop-area.drag-active {
+        border-color: var(--primary);
+        background: rgba(37, 99, 235, 0.08);
+      }
+
+      input:focus-visible,
+      button:focus-visible {
+        outline: 3px solid rgba(37, 99, 235, 0.22);
+        outline-offset: 1px;
+      }
+
+      .editor-shell {
+        border: 1px dashed var(--preview-border);
+        border-radius: 12px;
+        background: var(--preview-bg);
+        min-height: clamp(260px, 46vh, 460px);
+        padding: clamp(0.8rem, 2vw, 1rem);
+        display: grid;
+        place-items: center;
+        overflow: auto;
+      }
+
+      .placeholder {
+        margin: 0;
+        color: var(--muted);
+        text-align: center;
+        font-weight: 600;
+      }
+
+      .crop-stage {
+        position: relative;
+        display: inline-block;
+        max-width: 100%;
+        touch-action: none;
+      }
+
+      .crop-image {
+        display: block;
+        max-width: min(100%, 780px);
+        max-height: 58vh;
+        width: auto;
+        height: auto;
+        border-radius: 10px;
+        user-select: none;
+      }
+
+      .crop-box {
+        position: absolute;
+        border: 2px solid var(--crop-border);
+        box-shadow: 0 0 0 9999px var(--crop-mask), 0 8px 28px rgba(15, 23, 42, 0.32);
+        cursor: move;
+        min-width: 40px;
+        min-height: 40px;
+        display: none;
+        touch-action: none;
+      }
+
+      .crop-box::before,
+      .crop-box::after {
+        content: "";
+        position: absolute;
+        inset: 33.333% 0 auto;
+        border-top: 1px solid rgba(255, 255, 255, 0.72);
+      }
+
+      .crop-box::after {
+        inset: 0 33.333% 0 auto;
+        border-top: 0;
+        border-left: 1px solid rgba(255, 255, 255, 0.72);
+      }
+
+      .crop-guide-vertical,
+      .crop-guide-horizontal {
+        pointer-events: none;
+        position: absolute;
+        opacity: 0.72;
+      }
+
+      .crop-guide-vertical {
+        inset: 0 66.666% 0 auto;
+        border-left: 1px solid rgba(255, 255, 255, 0.72);
+      }
+
+      .crop-guide-horizontal {
+        inset: 66.666% 0 auto;
+        border-top: 1px solid rgba(255, 255, 255, 0.72);
+      }
+
+      .crop-handle {
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        border: 2px solid var(--primary);
+        border-radius: 999px;
+        background: #fff;
+        box-shadow: 0 3px 10px rgba(15, 23, 42, 0.22);
+      }
+
+      .crop-handle[data-handle="nw"] {
+        top: -10px;
+        left: -10px;
+        cursor: nwse-resize;
+      }
+
+      .crop-handle[data-handle="ne"] {
+        top: -10px;
+        right: -10px;
+        cursor: nesw-resize;
+      }
+
+      .crop-handle[data-handle="sw"] {
+        bottom: -10px;
+        left: -10px;
+        cursor: nesw-resize;
+      }
+
+      .crop-handle[data-handle="se"] {
+        right: -10px;
+        bottom: -10px;
+        cursor: nwse-resize;
+      }
+
+      .button-row {
+        margin-top: 0.25rem;
+      }
+
+      .crop-btn,
+      .download-btn {
+        border: 0;
+        border-radius: 10px;
+        background: var(--primary);
+        color: #fff;
+        font-weight: 600;
+        font-size: clamp(0.92rem, 1.8vw, 0.98rem);
+        padding: 0.8rem 1rem;
+        min-height: 46px;
+        width: 100%;
+        cursor: pointer;
+        transition: background-color 0.18s ease;
+      }
+
+      .crop-btn:hover,
+      .download-btn:hover {
+        background: var(--primary-hover);
+      }
+
+      .crop-btn:disabled,
+      .download-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .result-area {
+        border: 1px dashed var(--preview-border);
+        border-radius: 12px;
+        background: var(--preview-bg);
+        min-height: 220px;
+        padding: 1rem;
+        display: grid;
+        place-items: center;
+      }
+
+      .preview-content {
+        width: 100%;
+        display: grid;
+        justify-items: center;
+        gap: 0.75rem;
+      }
+
+      .preview-label {
+        margin: 0;
+        color: var(--preview-label);
+        font-weight: 700;
+      }
+
+      .result-image {
+        max-width: 100%;
+        max-height: 320px;
+        object-fit: contain;
+        border-radius: 10px;
+        border: 1px solid var(--preview-border);
+      }
+
+      .details-box {
+        width: 100%;
+        border: 1px solid var(--details-border);
+        border-radius: 10px;
+        background: var(--details-bg);
+        padding: 0.8rem;
+      }
+
+      .details-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 0.55rem;
+      }
+
+      .details-list li {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        color: var(--details-text);
+        font-size: clamp(0.86rem, 1.6vw, 0.92rem);
+      }
+
+      .details-key {
+        color: var(--details-key);
+        font-weight: 600;
+      }
+
+      .site-footer {
+        border-top: 1px solid var(--surface-border);
+        background: var(--header-bg);
+      }
+
+      .footer-inner {
+        max-width: 1080px;
+        margin: 0 auto;
+        width: min(100%, 1080px);
+        padding: 1rem clamp(1rem, 2.5vw, 1.5rem);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .footer-links a {
+        color: var(--muted);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .footer-links a:hover,
+      .footer-links a:focus-visible {
+        color: var(--primary);
+      }
+
+      .copyright {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      @media (max-width: 600px) {
+        body {
+          font-size: 15px;
+        }
+
+        main {
+          padding-top: 1rem;
+        }
+
+        .crop-card {
+          border-radius: 14px;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+        }
+
+        .editor-shell {
+          min-height: 240px;
+        }
+
+        .crop-image {
+          max-height: 48vh;
+        }
+
+        .details-list li {
+          flex-direction: column;
+          gap: 0.15rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="brand">QuickResizes</div>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">
+          🌙 Dark
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="crop-card" aria-labelledby="crop-heading">
+        <h1 id="crop-heading">Image Crop Tool</h1>
+        <p class="subtext">Upload, drag and resize the crop area, then export a clean cropped image directly in your browser.</p>
+
+        <form class="form-grid" action="#" method="post">
+          <div>
+            <label for="imageUpload">Upload image</label>
+            <div class="upload-drop-area" id="uploadDropArea" tabindex="0" role="button" aria-label="Upload image">
+              <p>Drag &amp; Drop or Paste Image or Click to Upload</p>
+            </div>
+            <input id="imageUpload" name="imageUpload" type="file" accept="image/*" />
+          </div>
+
+          <div class="editor-shell" aria-live="polite">
+            <p class="placeholder editor-placeholder">Image preview and crop area will appear here</p>
+            <div class="crop-stage" hidden>
+              <img class="crop-image" alt="Uploaded image preview" draggable="false" />
+              <div class="crop-box" aria-label="Resizable crop area" role="group">
+                <span class="crop-guide-vertical"></span>
+                <span class="crop-guide-horizontal"></span>
+                <span class="crop-handle" data-handle="nw" aria-hidden="true"></span>
+                <span class="crop-handle" data-handle="ne" aria-hidden="true"></span>
+                <span class="crop-handle" data-handle="sw" aria-hidden="true"></span>
+                <span class="crop-handle" data-handle="se" aria-hidden="true"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="crop-btn" type="button" disabled>Crop Image</button>
+          </div>
+        </form>
+
+        <div class="preview-grid" aria-live="polite">
+          <div class="result-area">
+            <div class="preview-content">
+              <p class="preview-label">Cropped Image</p>
+              <p class="placeholder result-placeholder">Cropped image preview will appear here</p>
+              <img class="result-image" alt="Cropped image preview" hidden />
+              <div class="details-box result-details" hidden>
+                <ul class="details-list">
+                  <li><span class="details-key">Crop Size</span><span class="detail-value result-dimensions"></span></li>
+                  <li><span class="details-key">File Size</span><span class="detail-value result-size"></span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="download-btn" type="button" disabled>Download Image</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="brand">QuickResizes</div>
+        <nav class="footer-links" aria-label="Footer navigation">
+          <a href="../../pages/about.html">About</a>
+          <a href="../../pages/contact.html">Contact</a>
+          <a href="../../pages/privacy.html">Privacy Policy</a>
+          <a href="../../pages/terms.html">Terms &amp; Conditions</a>
+        </nav>
+        <div class="copyright">&copy; <span id="year"></span> QuickResizes. All rights reserved.</div>
+      </div>
+    </footer>
+
+    <script>
+      const fileInput = document.getElementById("imageUpload");
+      const uploadDropArea = document.getElementById("uploadDropArea");
+      const cropStage = document.querySelector(".crop-stage");
+      const cropImage = document.querySelector(".crop-image");
+      const cropBox = document.querySelector(".crop-box");
+      const cropButton = document.querySelector(".crop-btn");
+      const downloadButton = document.querySelector(".download-btn");
+      const editorPlaceholder = document.querySelector(".editor-placeholder");
+      const resultPlaceholder = document.querySelector(".result-placeholder");
+      const resultImage = document.querySelector(".result-image");
+      const resultDetails = document.querySelector(".result-details");
+      const resultDimensions = document.querySelector(".result-dimensions");
+      const resultSize = document.querySelector(".result-size");
+      const root = document.documentElement;
+      const themeToggle = document.getElementById("themeToggle");
+      const themeStorageKey = "quickresizes-theme";
+      document.getElementById("year").textContent = new Date().getFullYear();
+
+      let currentFileUrl = "";
+      let croppedImageUrl = "";
+      let currentFile = null;
+      let cropMimeType = "image/png";
+      let imageMeta = null;
+      let cropRect = { x: 0, y: 0, width: 0, height: 0 };
+      let activeAction = null;
+
+      function applyTheme(theme) {
+        root.setAttribute("data-theme", theme);
+        const isDark = theme === "dark";
+        themeToggle.textContent = isDark ? "☀️ Light" : "🌙 Dark";
+        themeToggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+      }
+
+      applyTheme(localStorage.getItem(themeStorageKey) === "dark" ? "dark" : "light");
+
+      themeToggle.addEventListener("click", () => {
+        const nextTheme = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+        applyTheme(nextTheme);
+        localStorage.setItem(themeStorageKey, nextTheme);
+      });
+
+      function formatFileSize(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) {
+          return "0 KB";
+        }
+
+        if (bytes >= 1024 * 1024) {
+          return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        }
+
+        return `${(bytes / 1024).toFixed(2)} KB`;
+      }
+
+      function clearResult() {
+        if (croppedImageUrl) {
+          URL.revokeObjectURL(croppedImageUrl);
+          croppedImageUrl = "";
+        }
+
+        resultImage.hidden = true;
+        resultImage.removeAttribute("src");
+        resultPlaceholder.hidden = false;
+        resultDetails.hidden = true;
+        resultDimensions.textContent = "";
+        resultSize.textContent = "";
+        downloadButton.disabled = true;
+      }
+
+      function resetEditor() {
+        currentFile = null;
+        imageMeta = null;
+        cropStage.hidden = true;
+        cropImage.removeAttribute("src");
+        cropBox.style.display = "none";
+        editorPlaceholder.hidden = false;
+        cropButton.disabled = true;
+        clearResult();
+      }
+
+      function getStageSize() {
+        return {
+          width: cropImage.clientWidth,
+          height: cropImage.clientHeight,
+        };
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+      }
+
+      function renderCropBox() {
+        cropBox.style.left = `${cropRect.x}px`;
+        cropBox.style.top = `${cropRect.y}px`;
+        cropBox.style.width = `${cropRect.width}px`;
+        cropBox.style.height = `${cropRect.height}px`;
+        cropBox.style.display = "block";
+      }
+
+      function setInitialCropBox() {
+        const stage = getStageSize();
+        const width = Math.max(40, stage.width * 0.72);
+        const height = Math.max(40, stage.height * 0.72);
+
+        cropRect = {
+          x: (stage.width - width) / 2,
+          y: (stage.height - height) / 2,
+          width,
+          height,
+        };
+
+        renderCropBox();
+      }
+
+      function updateCropForResize(previousStage) {
+        if (!previousStage?.width || !previousStage?.height) {
+          setInitialCropBox();
+          return;
+        }
+
+        const stage = getStageSize();
+        cropRect = {
+          x: (cropRect.x / previousStage.width) * stage.width,
+          y: (cropRect.y / previousStage.height) * stage.height,
+          width: (cropRect.width / previousStage.width) * stage.width,
+          height: (cropRect.height / previousStage.height) * stage.height,
+        };
+        constrainCropRect();
+        renderCropBox();
+      }
+
+      function constrainCropRect() {
+        const stage = getStageSize();
+        const minSize = Math.min(40, stage.width, stage.height);
+        cropRect.width = clamp(cropRect.width, minSize, stage.width);
+        cropRect.height = clamp(cropRect.height, minSize, stage.height);
+        cropRect.x = clamp(cropRect.x, 0, stage.width - cropRect.width);
+        cropRect.y = clamp(cropRect.y, 0, stage.height - cropRect.height);
+      }
+
+      function processFile(file) {
+        if (currentFileUrl) {
+          URL.revokeObjectURL(currentFileUrl);
+          currentFileUrl = "";
+        }
+
+        if (!file || !file.type.startsWith("image/")) {
+          resetEditor();
+          return;
+        }
+
+        currentFile = file;
+        currentFileUrl = URL.createObjectURL(file);
+        clearResult();
+        cropImage.src = currentFileUrl;
+        cropStage.hidden = false;
+        editorPlaceholder.hidden = true;
+
+        cropImage.onload = () => {
+          imageMeta = {
+            width: cropImage.naturalWidth,
+            height: cropImage.naturalHeight,
+          };
+          cropMimeType = ["image/jpeg", "image/png", "image/webp"].includes(file.type) ? file.type : "image/png";
+          setInitialCropBox();
+          cropButton.disabled = false;
+        };
+      }
+
+      function getCropPixels() {
+        const stage = getStageSize();
+        const scaleX = imageMeta.width / stage.width;
+        const scaleY = imageMeta.height / stage.height;
+
+        return {
+          x: Math.round(cropRect.x * scaleX),
+          y: Math.round(cropRect.y * scaleY),
+          width: Math.round(cropRect.width * scaleX),
+          height: Math.round(cropRect.height * scaleY),
+        };
+      }
+
+      function startInteraction(event) {
+        if (!imageMeta) {
+          return;
+        }
+
+        event.preventDefault();
+        const handle = event.target.dataset.handle || "move";
+        activeAction = {
+          handle,
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          startRect: { ...cropRect },
+        };
+        cropBox.setPointerCapture(event.pointerId);
+      }
+
+      function moveInteraction(event) {
+        if (!activeAction || event.pointerId !== activeAction.pointerId) {
+          return;
+        }
+
+        const stage = getStageSize();
+        const minSize = Math.min(40, stage.width, stage.height);
+        const dx = event.clientX - activeAction.startX;
+        const dy = event.clientY - activeAction.startY;
+        const next = { ...activeAction.startRect };
+
+        if (activeAction.handle === "move") {
+          next.x = activeAction.startRect.x + dx;
+          next.y = activeAction.startRect.y + dy;
+        } else {
+          if (activeAction.handle.includes("e")) {
+            next.width = activeAction.startRect.width + dx;
+          }
+          if (activeAction.handle.includes("s")) {
+            next.height = activeAction.startRect.height + dy;
+          }
+          if (activeAction.handle.includes("w")) {
+            next.x = activeAction.startRect.x + dx;
+            next.width = activeAction.startRect.width - dx;
+          }
+          if (activeAction.handle.includes("n")) {
+            next.y = activeAction.startRect.y + dy;
+            next.height = activeAction.startRect.height - dy;
+          }
+        }
+
+        if (next.width < minSize) {
+          if (activeAction.handle.includes("w")) {
+            next.x -= minSize - next.width;
+          }
+          next.width = minSize;
+        }
+
+        if (next.height < minSize) {
+          if (activeAction.handle.includes("n")) {
+            next.y -= minSize - next.height;
+          }
+          next.height = minSize;
+        }
+
+        if (next.x < 0) {
+          if (activeAction.handle.includes("w")) {
+            next.width += next.x;
+          }
+          next.x = 0;
+        }
+
+        if (next.y < 0) {
+          if (activeAction.handle.includes("n")) {
+            next.height += next.y;
+          }
+          next.y = 0;
+        }
+
+        if (next.x + next.width > stage.width) {
+          if (activeAction.handle === "move") {
+            next.x = stage.width - next.width;
+          } else {
+            next.width = stage.width - next.x;
+          }
+        }
+
+        if (next.y + next.height > stage.height) {
+          if (activeAction.handle === "move") {
+            next.y = stage.height - next.height;
+          } else {
+            next.height = stage.height - next.y;
+          }
+        }
+
+        cropRect = next;
+        constrainCropRect();
+        renderCropBox();
+        clearResult();
+      }
+
+      function endInteraction(event) {
+        if (!activeAction || event.pointerId !== activeAction.pointerId) {
+          return;
+        }
+
+        cropBox.releasePointerCapture(event.pointerId);
+        activeAction = null;
+      }
+
+      fileInput.addEventListener("change", (event) => {
+        const [file] = event.target.files;
+        processFile(file);
+      });
+
+      uploadDropArea.addEventListener("click", () => {
+        fileInput.click();
+      });
+
+      uploadDropArea.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      ["dragenter", "dragover"].forEach((eventName) => {
+        uploadDropArea.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          uploadDropArea.classList.add("drag-active");
+        });
+      });
+
+      ["dragleave", "dragend"].forEach((eventName) => {
+        uploadDropArea.addEventListener(eventName, () => {
+          uploadDropArea.classList.remove("drag-active");
+        });
+      });
+
+      uploadDropArea.addEventListener("drop", (event) => {
+        event.preventDefault();
+        uploadDropArea.classList.remove("drag-active");
+        const [file] = event.dataTransfer?.files || [];
+        if (!file) {
+          return;
+        }
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        fileInput.files = transfer.files;
+        processFile(file);
+      });
+
+      document.addEventListener("paste", (event) => {
+        const items = event.clipboardData?.items || [];
+        for (const item of items) {
+          if (item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            if (!file) {
+              continue;
+            }
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            fileInput.files = transfer.files;
+            processFile(file);
+            break;
+          }
+        }
+      });
+
+      cropBox.addEventListener("pointerdown", startInteraction);
+      cropBox.addEventListener("pointermove", moveInteraction);
+      cropBox.addEventListener("pointerup", endInteraction);
+      cropBox.addEventListener("pointercancel", endInteraction);
+
+      cropButton.addEventListener("click", () => {
+        if (!currentFile || !imageMeta) {
+          return;
+        }
+
+        const cropPixels = getCropPixels();
+        const canvas = document.createElement("canvas");
+        canvas.width = cropPixels.width;
+        canvas.height = cropPixels.height;
+
+        const context = canvas.getContext("2d");
+        context.drawImage(
+          cropImage,
+          cropPixels.x,
+          cropPixels.y,
+          cropPixels.width,
+          cropPixels.height,
+          0,
+          0,
+          cropPixels.width,
+          cropPixels.height
+        );
+
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            return;
+          }
+
+          if (croppedImageUrl) {
+            URL.revokeObjectURL(croppedImageUrl);
+          }
+
+          croppedImageUrl = URL.createObjectURL(blob);
+          resultImage.src = croppedImageUrl;
+          resultImage.hidden = false;
+          resultPlaceholder.hidden = true;
+          resultDimensions.textContent = `${cropPixels.width} × ${cropPixels.height} px`;
+          resultSize.textContent = formatFileSize(blob.size);
+          resultDetails.hidden = false;
+          downloadButton.disabled = false;
+        }, cropMimeType, 0.92);
+      });
+
+      downloadButton.addEventListener("click", () => {
+        if (!croppedImageUrl) {
+          return;
+        }
+
+        const link = document.createElement("a");
+        const originalName = currentFile?.name ? currentFile.name.replace(/\.[^/.]+$/, "") : "cropped-image";
+        const extension = cropMimeType === "image/jpeg" ? "jpg" : cropMimeType === "image/webp" ? "webp" : "png";
+
+        link.href = croppedImageUrl;
+        link.download = `${originalName}-cropped.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+
+      window.addEventListener("resize", () => {
+        if (!imageMeta || cropStage.hidden) {
+          return;
+        }
+
+        const previousStage = {
+          width: Number.parseFloat(cropBox.dataset.stageWidth) || getStageSize().width,
+          height: Number.parseFloat(cropBox.dataset.stageHeight) || getStageSize().height,
+        };
+
+        window.requestAnimationFrame(() => {
+          updateCropForResize(previousStage);
+          const stage = getStageSize();
+          cropBox.dataset.stageWidth = stage.width;
+          cropBox.dataset.stageHeight = stage.height;
+        });
+      });
+
+      cropImage.addEventListener("load", () => {
+        const stage = getStageSize();
+        cropBox.dataset.stageWidth = stage.width;
+        cropBox.dataset.stageHeight = stage.height;
+      });
+    </script>
+  </body>
+</html>
