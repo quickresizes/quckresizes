@@ -27,9 +27,6 @@
         --details-bg: #ffffff;
         --details-text: #334155;
         --details-key: #64748b;
-        --secondary-btn-border: #bfdbfe;
-        --secondary-btn-bg: #eff6ff;
-        --secondary-btn-text: #1d4ed8;
         --toggle-bg: #e2e8f0;
         --toggle-text: #0f172a;
         --crop-mask: rgba(15, 23, 42, 0.42);
@@ -61,9 +58,6 @@
         --details-bg: #0b1220;
         --details-text: #cbd5e1;
         --details-key: #94a3b8;
-        --secondary-btn-border: #334155;
-        --secondary-btn-bg: #1e293b;
-        --secondary-btn-text: #bfdbfe;
         --toggle-bg: #1e293b;
         --toggle-text: #e2e8f0;
         --crop-mask: rgba(2, 6, 23, 0.58);
@@ -372,8 +366,7 @@
       }
 
       .crop-btn,
-      .download-btn,
-      .reset-crop-btn {
+      .download-btn {
         border: 0;
         border-radius: 10px;
         background: var(--primary);
@@ -392,20 +385,8 @@
         background: var(--primary-hover);
       }
 
-      .reset-crop-btn {
-        border: 1px solid var(--secondary-btn-border);
-        background: var(--secondary-btn-bg);
-        color: var(--secondary-btn-text);
-      }
-
-      .reset-crop-btn:hover {
-        border-color: var(--primary);
-        background: rgba(37, 99, 235, 0.12);
-      }
-
       .crop-btn:disabled,
-      .download-btn:disabled,
-      .reset-crop-btn:disabled {
+      .download-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
@@ -606,12 +587,11 @@
                 <input id="cropHeight" class="dimension-input" type="number" inputmode="numeric" min="1" step="1" />
               </div>
             </div>
-            <p class="dimension-hint">Drag on the image to move or draw a selection, resize with the corner handles, or type exact pixel values. Reset Crop restores the centered default selection.</p>
+            <p class="dimension-hint">Drag on the image to move or draw a selection, resize with the corner handles, or type exact pixel values.</p>
           </div>
 
-          <div class="button-row">
+          <div class="button-row single-action">
             <button class="crop-btn" type="button" disabled>Crop Image</button>
-            <button class="reset-crop-btn" type="button" disabled>Reset Crop</button>
           </div>
         </form>
 
@@ -658,7 +638,6 @@
       const cropImage = document.querySelector(".crop-image");
       const cropBox = document.querySelector(".crop-box");
       const cropButton = document.querySelector(".crop-btn");
-      const resetCropButton = document.querySelector(".reset-crop-btn");
       const downloadButton = document.querySelector(".download-btn");
       const dimensionControls = document.querySelector(".dimension-controls");
       const cropXInput = document.getElementById("cropX");
@@ -742,7 +721,6 @@
         });
         editorPlaceholder.hidden = false;
         cropButton.disabled = true;
-        resetCropButton.disabled = true;
         clearResult();
       }
 
@@ -866,7 +844,6 @@
           cropMimeType = ["image/jpeg", "image/png", "image/webp"].includes(file.type) ? file.type : "image/png";
           setInitialCropBox();
           cropButton.disabled = false;
-          resetCropButton.disabled = false;
           dimensionControls.hidden = false;
         };
       }
@@ -1145,15 +1122,6 @@
         input.addEventListener("input", applyDimensionInputs);
         input.addEventListener("change", applyDimensionInputs);
         input.addEventListener("blur", updateDimensionControls);
-      });
-
-      resetCropButton.addEventListener("click", () => {
-        if (!imageMeta) {
-          return;
-        }
-
-        setInitialCropBox();
-        clearResult();
       });
 
       cropButton.addEventListener("click", () => {
