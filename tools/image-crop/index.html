@@ -247,6 +247,7 @@
         min-height: 40px;
         display: none;
         touch-action: none;
+        will-change: left, top, width, height;
       }
 
       .crop-box::before,
@@ -312,6 +313,51 @@
         right: -10px;
         bottom: -10px;
         cursor: nwse-resize;
+      }
+
+
+      .dimension-controls {
+        border: 1px solid var(--input-border);
+        background: var(--input-bg);
+        border-radius: 12px;
+        padding: 0.9rem;
+        display: grid;
+        gap: 0.8rem;
+      }
+
+      .dimension-controls[hidden] {
+        display: none;
+      }
+
+      .dimension-heading {
+        margin: 0;
+        color: var(--preview-label);
+        font-weight: 700;
+        font-size: 0.95rem;
+      }
+
+      .dimension-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.8rem;
+      }
+
+      .dimension-input {
+        width: 100%;
+        border: 1px solid var(--input-border);
+        border-radius: 10px;
+        background: var(--input-bg);
+        color: var(--text);
+        min-height: 44px;
+        padding: 0.6rem 0.7rem;
+        font-size: clamp(0.92rem, 1.8vw, 0.98rem);
+      }
+
+      .dimension-hint {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.86rem;
+        line-height: 1.45;
       }
 
       .button-row {
@@ -469,6 +515,10 @@
           flex-direction: column;
           gap: 0.15rem;
         }
+
+        .dimension-grid {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
@@ -509,6 +559,21 @@
                 <span class="crop-handle" data-handle="se" aria-hidden="true"></span>
               </div>
             </div>
+          </div>
+
+          <div class="dimension-controls" hidden>
+            <p class="dimension-heading">Crop selection size</p>
+            <div class="dimension-grid">
+              <div>
+                <label for="cropWidth">Width (px)</label>
+                <input id="cropWidth" class="dimension-input" type="number" inputmode="numeric" min="1" step="1" />
+              </div>
+              <div>
+                <label for="cropHeight">Height (px)</label>
+                <input id="cropHeight" class="dimension-input" type="number" inputmode="numeric" min="1" step="1" />
+              </div>
+            </div>
+            <p class="dimension-hint">Drag on the image to draw a new selection, drag the box to move it, or use the corner handles and size fields for precise crops.</p>
           </div>
 
           <div class="button-row">
@@ -559,6 +624,9 @@
       const cropBox = document.querySelector(".crop-box");
       const cropButton = document.querySelector(".crop-btn");
       const downloadButton = document.querySelector(".download-btn");
+      const dimensionControls = document.querySelector(".dimension-controls");
+      const cropWidthInput = document.getElementById("cropWidth");
+      const cropHeightInput = document.getElementById("cropHeight");
       const editorPlaceholder = document.querySelector(".editor-placeholder");
       const resultPlaceholder = document.querySelector(".result-placeholder");
       const resultImage = document.querySelector(".result-image");
@@ -577,6 +645,7 @@
       let imageMeta = null;
       let cropRect = { x: 0, y: 0, width: 0, height: 0 };
       let activeAction = null;
+      let renderFrame = 0;
 
       function applyTheme(theme) {
         root.setAttribute("data-theme", theme);
@@ -626,6 +695,9 @@
         cropStage.hidden = true;
         cropImage.removeAttribute("src");
         cropBox.style.display = "none";
+        dimensionControls.hidden = true;
+        cropWidthInput.value = "";
+        cropHeightInput.value = "";
         editorPlaceholder.hidden = false;
         cropButton.disabled = true;
         clearResult();
@@ -642,12 +714,40 @@
         return Math.min(Math.max(value, min), max);
       }
 
+      function updateDimensionControls() {
+        if (!imageMeta || cropStage.hidden) {
+          return;
+        }
+
+        const cropPixels = getCropPixels();
+        if (document.activeElement !== cropWidthInput) {
+          cropWidthInput.value = cropPixels.width;
+        }
+        if (document.activeElement !== cropHeightInput) {
+          cropHeightInput.value = cropPixels.height;
+        }
+      }
+
+      function applyCropRect(nextRect) {
+        cropRect = nextRect;
+        constrainCropRect();
+        renderCropBox();
+      }
+
       function renderCropBox() {
-        cropBox.style.left = `${cropRect.x}px`;
-        cropBox.style.top = `${cropRect.y}px`;
-        cropBox.style.width = `${cropRect.width}px`;
-        cropBox.style.height = `${cropRect.height}px`;
-        cropBox.style.display = "block";
+        if (renderFrame) {
+          cancelAnimationFrame(renderFrame);
+        }
+
+        renderFrame = requestAnimationFrame(() => {
+          cropBox.style.left = `${cropRect.x}px`;
+          cropBox.style.top = `${cropRect.y}px`;
+          cropBox.style.width = `${cropRect.width}px`;
+          cropBox.style.height = `${cropRect.height}px`;
+          cropBox.style.display = "block";
+          updateDimensionControls();
+          renderFrame = 0;
+        });
       }
 
       function setInitialCropBox() {
@@ -717,6 +817,7 @@
           cropMimeType = ["image/jpeg", "image/png", "image/webp"].includes(file.type) ? file.type : "image/png";
           setInitialCropBox();
           cropButton.disabled = false;
+          dimensionControls.hidden = false;
         };
       }
 
@@ -725,12 +826,41 @@
         const scaleX = imageMeta.width / stage.width;
         const scaleY = imageMeta.height / stage.height;
 
+        const x = clamp(Math.round(cropRect.x * scaleX), 0, imageMeta.width - 1);
+        const y = clamp(Math.round(cropRect.y * scaleY), 0, imageMeta.height - 1);
+
         return {
-          x: Math.round(cropRect.x * scaleX),
-          y: Math.round(cropRect.y * scaleY),
-          width: Math.round(cropRect.width * scaleX),
-          height: Math.round(cropRect.height * scaleY),
+          x,
+          y,
+          width: clamp(Math.round(cropRect.width * scaleX), 1, imageMeta.width - x),
+          height: clamp(Math.round(cropRect.height * scaleY), 1, imageMeta.height - y),
         };
+      }
+
+      function getPointerPoint(event) {
+        const bounds = cropImage.getBoundingClientRect();
+        return {
+          x: clamp(event.clientX - bounds.left, 0, bounds.width),
+          y: clamp(event.clientY - bounds.top, 0, bounds.height),
+        };
+      }
+
+      function startSelection(event) {
+        if (!imageMeta || event.target.closest(".crop-box")) {
+          return;
+        }
+
+        event.preventDefault();
+        const point = getPointerPoint(event);
+        activeAction = {
+          handle: "draw",
+          pointerId: event.pointerId,
+          origin: point,
+          captureElement: cropStage,
+        };
+        cropStage.setPointerCapture(event.pointerId);
+        applyCropRect({ x: point.x, y: point.y, width: 1, height: 1 });
+        clearResult();
       }
 
       function startInteraction(event) {
@@ -739,6 +869,7 @@
         }
 
         event.preventDefault();
+        event.stopPropagation();
         const handle = event.target.dataset.handle || "move";
         activeAction = {
           handle,
@@ -746,6 +877,7 @@
           startX: event.clientX,
           startY: event.clientY,
           startRect: { ...cropRect },
+          captureElement: cropBox,
         };
         cropBox.setPointerCapture(event.pointerId);
       }
@@ -757,6 +889,18 @@
 
         const stage = getStageSize();
         const minSize = Math.min(40, stage.width, stage.height);
+
+        if (activeAction.handle === "draw") {
+          const point = getPointerPoint(event);
+          const x = Math.min(activeAction.origin.x, point.x);
+          const y = Math.min(activeAction.origin.y, point.y);
+          const width = Math.max(minSize, Math.abs(point.x - activeAction.origin.x));
+          const height = Math.max(minSize, Math.abs(point.y - activeAction.origin.y));
+          applyCropRect({ x, y, width, height });
+          clearResult();
+          return;
+        }
+
         const dx = event.clientX - activeAction.startX;
         const dy = event.clientY - activeAction.startY;
         const next = { ...activeAction.startRect };
@@ -825,9 +969,7 @@
           }
         }
 
-        cropRect = next;
-        constrainCropRect();
-        renderCropBox();
+        applyCropRect(next);
         clearResult();
       }
 
@@ -836,8 +978,11 @@
           return;
         }
 
-        cropBox.releasePointerCapture(event.pointerId);
+        if (activeAction.captureElement?.hasPointerCapture(event.pointerId)) {
+          activeAction.captureElement.releasePointerCapture(event.pointerId);
+        }
         activeAction = null;
+        updateDimensionControls();
       }
 
       fileInput.addEventListener("change", (event) => {
@@ -899,10 +1044,35 @@
         }
       });
 
+      cropStage.addEventListener("pointerdown", startSelection);
+      cropStage.addEventListener("pointermove", moveInteraction);
+      cropStage.addEventListener("pointerup", endInteraction);
+      cropStage.addEventListener("pointercancel", endInteraction);
       cropBox.addEventListener("pointerdown", startInteraction);
-      cropBox.addEventListener("pointermove", moveInteraction);
-      cropBox.addEventListener("pointerup", endInteraction);
-      cropBox.addEventListener("pointercancel", endInteraction);
+
+      function applyDimensionInputs() {
+        if (!imageMeta) {
+          return;
+        }
+
+        const stage = getStageSize();
+        const scaleX = stage.width / imageMeta.width;
+        const scaleY = stage.height / imageMeta.height;
+        const nextWidth = Number.parseInt(cropWidthInput.value, 10);
+        const nextHeight = Number.parseInt(cropHeightInput.value, 10);
+
+        applyCropRect({
+          ...cropRect,
+          width: Number.isFinite(nextWidth) ? nextWidth * scaleX : cropRect.width,
+          height: Number.isFinite(nextHeight) ? nextHeight * scaleY : cropRect.height,
+        });
+        clearResult();
+      }
+
+      [cropWidthInput, cropHeightInput].forEach((input) => {
+        input.addEventListener("change", applyDimensionInputs);
+        input.addEventListener("blur", updateDimensionControls);
+      });
 
       cropButton.addEventListener("click", () => {
         if (!currentFile || !imageMeta) {
