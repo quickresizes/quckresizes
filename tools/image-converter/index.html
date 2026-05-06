@@ -74,7 +74,7 @@
     </main>
 
     <script>
-      const state = { originalFile: null, convertedBlob: null, outputUrl: '', inputUrl: '' };
+      const state = { originalFile: null, convertedBlob: null, outputUrl: '', inputUrl: '', liveTimer: null, conversionNonce: 0 };
       const dom = {
         uploadBox: document.getElementById('uploadBox'), fileInput: document.getElementById('fileInput'),
         formatSelect: document.getElementById('format'), convertBtn: document.getElementById('convertBtn'), downloadBtn: document.getElementById('downloadBtn'),
@@ -140,9 +140,13 @@
         dom.downloadBtn.disabled = true; updateConvertState();
       }
 
-      async function convertImage() {
+      async function convertImage({ isLive = false } = {}) {
         if (!canConvert()) return;
-        setLoading(true); dom.statusNote.textContent = '';
+        const myNonce = ++state.conversionNonce;
+        if (!isLive) {
+          setLoading(true);
+          dom.statusNote.textContent = '';
+        }
         try {
           const bitmap = await createImageBitmap(state.originalFile);
           const canvas = document.createElement('canvas');
@@ -153,6 +157,7 @@
           const quality = formatMap[mime].quality ? q : undefined;
           state.convertedBlob = await new Promise(r=>canvas.toBlob(r,mime,quality));
           if (!state.convertedBlob) throw new Error('Conversion failed');
+          if (myNonce !== state.conversionNonce) return;
           revokeUrl('output'); state.outputUrl = URL.createObjectURL(state.convertedBlob);
           dom.convertedPreview.classList.add('updating');
           dom.convertedPreview.src = state.outputUrl;
@@ -161,10 +166,17 @@
           updateConvertedInfo(mime, state.convertedBlob.size);
           dom.downloadBtn.disabled = false;
         } catch (e) {
-          dom.statusNote.textContent = 'Could not convert this file in your browser.';
+          if (!isLive) dom.statusNote.textContent = 'Could not convert this file in your browser.';
         } finally {
-          setLoading(false);
+          if (!isLive) setLoading(false);
         }
+      }
+
+      function scheduleLivePreview() {
+        if (!state.originalFile || !canConvert()) return;
+        if (!formatMap[normalize(dom.formatSelect.value)]?.quality) return;
+        clearTimeout(state.liveTimer);
+        state.liveTimer = setTimeout(() => convertImage({ isLive: true }), 120);
       }
 
       function downloadImage() {
@@ -183,7 +195,10 @@
       dom.uploadBox.addEventListener('drop',e=>{e.preventDefault();dom.uploadBox.classList.remove('drag-active');handleFile(e.dataTransfer.files[0])});
       document.addEventListener('paste',e=>{const f=[...e.clipboardData.items].find(i=>i.type.startsWith('image/'));if(f)handleFile(f.getAsFile())});
       dom.formatSelect.addEventListener('change', () => { updateQualityUI(); updateConvertState(); });
-      dom.qualityInput.addEventListener('input', updateQualityUI);
+      dom.qualityInput.addEventListener('input', () => {
+        updateQualityUI();
+        scheduleLivePreview();
+      });
       dom.convertBtn.addEventListener('click', convertImage);
       dom.downloadBtn.addEventListener('click', downloadImage);
       updateQualityUI();
